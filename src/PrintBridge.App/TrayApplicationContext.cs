@@ -327,6 +327,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         string worker = Path.Combine(Path.GetDirectoryName(package)!, "PrintBridge.Update.exe");
         File.Copy(Environment.ProcessPath!, worker, overwrite: true);
+#if SIGNED_RELEASE
+        File.Copy(Environment.ProcessPath! + ".sig", worker + ".sig", overwrite: true);
+#endif
         var start = new System.Diagnostics.ProcessStartInfo(worker) { UseShellExecute = false };
         start.ArgumentList.Add("--install-update");
         start.ArgumentList.Add(package);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.7
+
+- Verify the installed executable before starting the print bridge in signed releases. A failed check stops startup and records the error.
+
 ## 1.2.6
 
 - Added the PrintBridge icon to the window header and overlaid the connection indicator on it.

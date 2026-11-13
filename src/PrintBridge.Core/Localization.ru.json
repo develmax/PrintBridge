@@ -1,4 +1,5 @@
 {
+  "PrintBridge could not verify its signature. Reinstall it from the official release.": "Не удалось подтвердить подпись PrintBridge. Переустановите программу из официального релиза.",
   "Automatically check for and install updates": "Автоматически проверять и устанавливать обновления",
   "Check for updates now": "Проверить обновления сейчас",
   "No newer compatible release is available.": "Более новой совместимой версии нет.",

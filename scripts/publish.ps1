@@ -1,9 +1,12 @@
-param([ValidateSet('win-x64','win-arm64')][string]$Runtime = 'win-x64')
+param(
+    [ValidateSet('win-x64','win-arm64')][string]$Runtime = 'win-x64',
+    [switch]$Sign
+)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root 'src/PrintBridge.App/PrintBridge.App.csproj'
 $output = Join-Path $root "artifacts/publish/$Runtime"
-dotnet publish $project -c Release -r $Runtime --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:UseSharedCompilation=false -m:1 -o $output
+dotnet publish $project -c Release -r $Runtime --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:UseSharedCompilation=false "-p:PrintBridgeSignedRelease=$($Sign.IsPresent.ToString().ToLowerInvariant())" -m:1 -o $output
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
 
 $assets = Get-Content -Raw (Join-Path (Split-Path $project) 'obj/project.assets.json') | ConvertFrom-Json -AsHashtable

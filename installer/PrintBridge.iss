@@ -1,5 +1,5 @@
 #ifndef BuildVersion
-  #define BuildVersion "1.2.6"
+  #define BuildVersion "1.2.7"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\win-x64"
@@ -62,6 +62,9 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD-PARTY-NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PublishDir}\ThirdParty\*"; DestDir: "{app}\ThirdParty"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PublishDir}\PrintBridge.exe"; DestDir: "{app}"; Flags: ignoreversion
+#ifdef SignedRelease
+Source: "{#PublishDir}\PrintBridge.exe.sig"; DestDir: "{app}"; Flags: ignoreversion
+#endif
 
 [Icons]
 Name: "{group}\PrintBridge"; Filename: "{app}\PrintBridge.exe"

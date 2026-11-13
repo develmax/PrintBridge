@@ -36,6 +36,21 @@ internal static class Program
         var install = provider.GetRequiredService<InstallationIntegrationService>();
         try
         {
+#if SIGNED_RELEASE
+            if (args.FirstOrDefault() is not ("--stop" or "--stop-for-update" or "--msi-stop" or "--uninstall"))
+            {
+                Select(args.FirstOrDefault() == "--spooler" && args.Length == 4
+                    ? args[3] : provider.GetRequiredService<SettingsService>().Load().Language);
+                if (!ReleaseSignature.VerifyExecutable(Environment.ProcessPath!))
+                {
+                    string message = T("PrintBridge could not verify its signature. Reinstall it from the official release.");
+                    provider.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge").LogError("{Message}", message);
+                    if (!args.Any(arg => arg is "--quiet" or "--tray" or "--after-update" or "--install-update"))
+                        MessageBox.Show(message, "PrintBridge", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return 1;
+                }
+            }
+#endif
             if (args.FirstOrDefault() == "--install-update" && args.Length == 3)
             {
                 bool msi = Path.GetExtension(args[1]) == ".msi";
