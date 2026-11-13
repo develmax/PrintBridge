@@ -7,3 +7,4 @@ TestResults/
 *.pfx
 *.p12
 *.key
+/.signing-backup/
