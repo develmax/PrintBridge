@@ -4,6 +4,18 @@ public sealed class UpdateTests
 {
     private static readonly Version Current = new(1, 2, 0);
 
+    [Theory]
+    [InlineData(60, false, 300)]
+    [InlineData(60, true, 60)]
+    [InlineData(120, false, 120)]
+    public void MigratesOnlyTheLegacyDefaultInterval(int seconds, bool configured, int expected)
+    {
+        Assert.Equal(300, new AppSettings().IntervalSeconds);
+        var settings = SettingsService.NormalizeIdleInterval(new AppSettings(IntervalSeconds: seconds, IdleIntervalConfigured: configured));
+        Assert.Equal(expected, settings.IntervalSeconds);
+        Assert.True(settings.IdleIntervalConfigured);
+    }
+
     [Fact]
     public void UpdatesDefaultToEnabledAndRespectSavedOptOut()
     {

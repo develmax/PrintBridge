@@ -110,7 +110,7 @@ internal sealed class PreferencesForm : Form
         };
         body.Controls.Add(checkUpdate);
         body.SetColumnSpan(checkUpdate, 2);
-        interval = Number(T("Check interval (seconds)"), settings.IntervalSeconds, 15, 3600);
+        interval = Number(T("Idle check interval (seconds)"), settings.IntervalSeconds, 15, 3600);
         local = Number(T("Local port"), settings.LocalPort, 1024, 65535);
         local.Enabled = settings.Profile == null;
         connect = Number(T("Connect timeout (seconds)"), settings.ConnectSeconds, 1, 30);

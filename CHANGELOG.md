@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.4
+
+- Reduced idle printer checks to once every five minutes by default. Incoming jobs still connect immediately and retry if needed.
+- Moved common actions above the printer queue, with system icons and a **More** menu for maintenance and support.
+
 ## 1.2.3
 
 - Suppressed initial printer status notifications when starting with Windows or restarting after an update.

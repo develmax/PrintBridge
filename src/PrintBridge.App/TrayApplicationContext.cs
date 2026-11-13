@@ -214,7 +214,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (!dashboard.Busy && dashboard.Pending == null && dashboard.Settings.Profile != null && !dashboard.Monitor.Paused)
         {
             bool networkEvent = Interlocked.Exchange(ref networkChanged, 0) != 0;
-            if (networkEvent || !(DateTimeOffset.UtcNow < nextCheck))
+            if (networkEvent || (dashboard.Bridge.Active == 0 && DateTimeOffset.UtcNow >= nextCheck))
             {
                 nextCheck = DateTimeOffset.UtcNow.AddSeconds(dashboard.Settings.IntervalSeconds);
                 await dashboard.CheckAsync(networkEvent, background: true);

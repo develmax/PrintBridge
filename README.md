@@ -38,7 +38,7 @@ PrintBridge checks shortly after launch and every 12 hours while running, and in
 | A job disappears without printing | Check **Last connection error** in the TCP bridge panel and the printer's own job log. A Windows queue status alone does not confirm delivery. |
 | Restore or uninstall reports a conflict | Wait for pending jobs to finish and check whether another queue uses the bridge port. Keep the saved profile until restoration finishes. |
 
-The default monitor interval is 60 seconds. When the printer is temporarily unavailable, the bridge retries the connection before forwarding job data. The bridge listens on loopback. It does not change VPN policies or send diagnostics to an external service. The diagnostic export can omit network and queue identifiers.
+The default monitor interval is five minutes while idle. A print job starts connecting immediately and the bridge retries if the printer is temporarily unavailable. The bridge listens on loopback. It does not change VPN policies or send diagnostics to an external service. The diagnostic export can omit network and queue identifiers.
 
 Use **Report a bug** to preview, copy, or save a report with network and queue identifiers removed. **Open GitHub draft** fills in the app version and prompts for reproduction steps. You can paste the report into the public issue and submit it from GitHub.
 

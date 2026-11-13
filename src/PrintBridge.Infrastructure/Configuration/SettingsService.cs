@@ -22,8 +22,15 @@ public sealed class SettingsService
         var settings = Read<AppSettings>("settings.json") ?? new();
         var installed = Microsoft.Win32.Registry.GetValue(
             @"HKEY_CURRENT_USER\Software\PrintBridge", "InstallerLanguage", null) as string;
-        return settings with { Language = Normalize(settings.Language ?? installed) };
+        return NormalizeIdleInterval(settings) with { Language = Normalize(settings.Language ?? installed) };
     }
+
+    internal static AppSettings NormalizeIdleInterval(AppSettings settings) =>
+        settings.IdleIntervalConfigured ? settings : settings with
+        {
+            IntervalSeconds = settings.IntervalSeconds == 60 ? 300 : settings.IntervalSeconds,
+            IdleIntervalConfigured = true
+        };
 
     public PrintPlan? Pending()
     {

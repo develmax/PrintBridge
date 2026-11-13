@@ -56,17 +56,21 @@ internal sealed class Dashboard : Form
 
     private readonly FlowLayoutPanel actions = new FlowLayoutPanel
     {
-        Dock = DockStyle.Bottom,
+        Dock = DockStyle.Fill,
         AutoSize = true,
         AutoSizeMode = AutoSizeMode.GrowAndShrink,
-        Padding = new Padding(18, 0, 18, 10)
+        Padding = new Padding(0, 0, 0, 5)
     };
 
     private readonly Button configure;
+    private readonly Button check;
 
     private readonly Button test;
 
-    private readonly Button restore;
+    private readonly ToolStripMenuItem restore;
+    private readonly ToolStripMenuItem choosePrinter;
+    private readonly ContextMenuStrip moreActions = new();
+    private readonly Font commandIconFont = new("Segoe MDL2 Assets", 11f);
 
     private bool exiting;
 
@@ -126,7 +130,6 @@ internal sealed class Dashboard : Form
             Padding = new Padding(18, 18, 18, 6)
         };
         Controls.Add(body);
-        Controls.Add(actions);
         Controls.Add(progress);
         body.Controls.Add(new Label
         {
@@ -134,14 +137,10 @@ internal sealed class Dashboard : Form
             Font = new Font(Font.FontFamily, 22f, FontStyle.Bold),
             AutoSize = true
         });
-        body.Controls.Add(new Label
-        {
-            Text = T("Your printer. Always connected."),
-            AutoSize = true
-        });
         headline.Font = new Font(Font.FontFamily, 11f, FontStyle.Bold);
         headline.Margin = new Padding(3, 12, 3, 8);
         body.Controls.Add(headline);
+        body.Controls.Add(actions);
         string[] sections = new string[3] { T("Windows queue"), T("Physical printer"), "Wi-Fi" };
         for (int index = 0; index < sections.Length; index++)
         {
@@ -171,21 +170,27 @@ internal sealed class Dashboard : Form
         body.RowStyles.Add(new RowStyle(SizeType.Percent, 58f));
         body.Controls.Add(DetailsSection(T("TCP bridge"), bridgeDetails));
         body.Controls.Add(DetailsSection(T("Routing"), routeDetails));
-        configure = Add(T("Connect Windows queue"), ConfigureAsync);
-        Add(T("Find printer"), () => CheckAsync(force: true));
-        Add(T("Check connection"), () => CheckAsync(force: false));
-        Add(T("Restart bridge"), RestartAsync);
-        test = Add(T("Print test page"), TestPageAsync);
-        restore = Add(T("Restore original port"), RestoreAsync);
-        Add(T("Settings"), SettingsAsync);
-        Add(T("Diagnostics"), ExportAsync);
-        Add(T("Report a bug"), ReportBugAsync);
-        Add(T("Open logs"), () =>
+        configure = Add(T("Connect Windows queue"), ConfigureAsync, "\uE710");
+        check = Add(T("Check connection"), () => CheckAsync(force: false), "\uE72C");
+        test = Add(T("Print test page"), TestPageAsync, "\uE749");
+        Add(T("Settings"), SettingsAsync, "\uE713");
+        var more = Add(T("More"), "\uE712");
+        more.Click += (_, _) => moreActions.Show(more, new Point(0, more.Height));
+        more.ContextMenuStrip = moreActions;
+
+        choosePrinter = AddMenu(T("Choose another printer"), ConfigureAsync);
+        AddMenu(T("Find printer"), () => CheckAsync(force: true));
+        AddMenu(T("Restart bridge"), RestartAsync);
+        restore = AddMenu(T("Restore original port"), RestoreAsync);
+        moreActions.Items.Add(new ToolStripSeparator());
+        AddMenu(T("Diagnostics"), ExportAsync);
+        AddMenu(T("Report a bug"), ReportBugAsync);
+        AddMenu(T("Open logs"), () =>
         {
             OpenLogs();
             return Task.CompletedTask;
         });
-        Add(T("About"), () => { using var about = new AboutForm(); about.ShowDialog(this); return Task.CompletedTask; });
+        AddMenu(T("About"), () => { using var about = new AboutForm(); about.ShowDialog(this); return Task.CompletedTask; });
         Monitor.Changed += Render;
         Render();
     }
@@ -218,20 +223,44 @@ internal sealed class Dashboard : Form
         };
     }
 
-    private Button Add(string title, Func<Task> click)
+    private Button Add(string title, Func<Task> click, string glyph)
+    {
+        var button = Add(title, glyph);
+        button.Click += async (_, _) => await click();
+        return button;
+    }
+
+    private Button Add(string title, string glyph)
     {
         Button button = new Button
         {
             Text = title,
             AutoSize = true,
-            Padding = new Padding(5, 3, 5, 3)
-        };
-        button.Click += async (object? _, EventArgs _) =>
-        {
-            await click();
+            Padding = new Padding(6, 3, 6, 3),
+            TextImageRelation = TextImageRelation.ImageBeforeText,
+            Image = CreateCommandIcon(glyph)
         };
         actions.Controls.Add(button);
         return button;
+    }
+
+    private Bitmap CreateCommandIcon(string glyph)
+    {
+        int size = LogicalToDeviceUnits(18);
+        var image = new Bitmap(size, size);
+        image.SetResolution(DeviceDpi, DeviceDpi);
+        using var graphics = Graphics.FromImage(image);
+        TextRenderer.DrawText(graphics, glyph, commandIconFont, new Rectangle(0, 0, size, size),
+            SystemColors.ControlText, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        return image;
+    }
+
+    private ToolStripMenuItem AddMenu(string title, Func<Task> click)
+    {
+        var item = new ToolStripMenuItem(title);
+        item.Click += async (_, _) => await click();
+        moreActions.Items.Add(item);
+        return item;
     }
 
     public void Render()
@@ -266,7 +295,9 @@ internal sealed class Dashboard : Form
         {
             routeDetails.Text = route;
         }
-        configure.Text = ((Settings.Profile == null) ? T("Connect Windows queue") : T("Choose another printer"));
+        configure.Visible = Settings.Profile == null && Pending == null;
+        check.Visible = test.Visible = Settings.Profile != null && Pending == null;
+        choosePrinter.Visible = Settings.Profile != null && Pending == null;
         test.Enabled = !Busy && Bridge.Running && Bridge.Target != null && Pending == null;
         restore.Enabled = !Busy && plan != null;
         StatusChanged?.Invoke();
@@ -589,6 +620,10 @@ internal sealed class Dashboard : Form
         if (disposing)
         {
             portTip.Dispose();
+            moreActions.Dispose();
+            commandIconFont.Dispose();
+            foreach (Button button in actions.Controls)
+                button.Image?.Dispose();
         }
         base.Dispose(disposing);
     }
