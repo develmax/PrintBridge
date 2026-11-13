@@ -91,9 +91,9 @@ internal sealed class PreferencesForm : Form
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 49f));
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 51f));
         Controls.Add(body);
+        Row(T("Language"), language);
         language.DataSource = Languages.ToArray();
         language.SelectedValue = Normalize(settings.Language);
-        Row(T("Language"), language);
         startup = Check(T("Start with Windows"), runAtStartup);
         hidden = Check(T("Start minimized to the tray"), settings.StartHidden);
         notify = Check(T("Show tray notifications"), settings.Notify);

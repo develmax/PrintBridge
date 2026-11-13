@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+
+- Redesigned the main window with a clear printer status and expandable connection and routing details.
+- Added links to Windows Printer Properties and the print queue. The queue card shows the number of jobs reported by Windows.
+- Expanded the application and EXE installer to 15 languages.
+
 ## 1.2.8
 
 - Added printer discovery and printing through physical Ethernet adapters alongside Wi-Fi.
