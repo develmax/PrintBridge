@@ -40,6 +40,8 @@ try {
 
 For the first upgrade from an older release, verify and install the signed 1.2.6 package to establish the trust anchor. The updater in 1.2.6 and later uses its embedded copy of this certificate, verifies the signed manifest before downloading the installer, and verifies the installer again before executing it.
 
+Signed releases starting with 1.2.7 also verify the full executable against the adjacent `PrintBridge.exe.sig` before starting the bridge. Startup fails if either file is damaged or the signature is missing or invalid. Tray startup records the failure in the log, and interactive startup also displays a reinstall message. Stop and uninstall commands remain available for recovery. This check runs inside the executable. Enforcement before execution requires a separate trusted control such as Windows App Control.
+
 ## Publishing a signed release
 
 GitHub Actions builds and tests unsigned CI artifacts. For public release, build on the maintainer's Windows account with the signing key in `Cert:\CurrentUser\My`, WiX, Inno Setup, and Windows SDK SignTool. Run `scripts/build-release-packages.ps1 -Sign` once per runtime, gather the six packages in a single directory, and run `scripts/sign-release-manifest.ps1 -Directory <directory>`. Publish those six files, the checksum manifest, and its detached signature as release assets. Keep the private key and encrypted backups outside Git and GitHub Actions.

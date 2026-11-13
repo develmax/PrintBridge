@@ -17,14 +17,24 @@ if (-not $Iscc) {
 }
 if (-not $Iscc) { throw 'ISCC.exe is missing. Install Inno Setup or pass -Iscc.' }
 
-& (Join-Path $PSScriptRoot 'publish.ps1') -Runtime $Runtime
+& (Join-Path $PSScriptRoot 'publish.ps1') -Runtime $Runtime -Sign:$Sign
 if ($Sign) {
-    & (Join-Path $PSScriptRoot 'sign-binary.ps1') (Join-Path $root "artifacts/publish/$Runtime/PrintBridge.exe")
+    $app = Join-Path $root "artifacts/publish/$Runtime/PrintBridge.exe"
+    & (Join-Path $PSScriptRoot 'sign-binary.ps1') $app
+    $public = Get-PfxCertificate (Join-Path $root 'docs/printbridge-signing.cer')
+    $certificate = Get-Item "Cert:/CurrentUser/My/$($public.Thumbprint)"
+    $key = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($certificate)
+    try {
+        $hash = [Convert]::FromHexString((Get-FileHash -LiteralPath $app).Hash)
+        $signature = $key.SignHash($hash,[Security.Cryptography.HashAlgorithmName]::SHA256,[Security.Cryptography.RSASignaturePadding]::Pkcs1)
+        [IO.File]::WriteAllBytes("$app.sig", $signature)
+    } finally { $key.Dispose() }
 }
 $version = ([xml](Get-Content -Raw (Join-Path $root 'Directory.Build.props'))).Project.PropertyGroup.Version
 $arch = if ($Runtime -eq 'win-arm64') { 'arm64' } else { 'x64compatible' }
 $output = if ($Runtime -eq 'win-arm64') { 'artifacts/installer/arm64' } else { 'artifacts/installer' }
-& $Iscc "/O$(Join-Path $root $output)" "/DBuildVersion=$version" "/DArch=$arch" "/DRuntimeName=$Runtime" "/DPublishDir=$root\artifacts\publish\$Runtime" (Join-Path $root 'installer/PrintBridge.iss')
+$signFlag = @(if ($Sign) { '/DSignedRelease=1' })
+& $Iscc @signFlag "/O$(Join-Path $root $output)" "/DBuildVersion=$version" "/DArch=$arch" "/DRuntimeName=$Runtime" "/DPublishDir=$root\artifacts\publish\$Runtime" (Join-Path $root 'installer/PrintBridge.iss')
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
 $installer = Get-Item (Join-Path (Join-Path $root $output) "PrintBridge-Setup-$version-$Runtime.exe")
 if ($Sign) { & (Join-Path $PSScriptRoot 'sign-binary.ps1') $installer.FullName }

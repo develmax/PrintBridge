@@ -31,6 +31,9 @@
         <Directory Id="INSTALLFOLDER" Name="PrintBridge">
           <Component Id="Application" Guid="$(var.AppComponent)">
             <File Id="ApplicationExe" Source="$(var.PublishDir)\PrintBridge.exe" />
+            <?ifdef SignedRelease?>
+            <File Source="$(var.PublishDir)\PrintBridge.exe.sig" />
+            <?endif?>
             <File Source="msi-installation.txt" />
             <File Source="..\LICENSE" />
             <File Source="..\THIRD-PARTY-NOTICES.md" />

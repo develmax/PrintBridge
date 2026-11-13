@@ -14,8 +14,10 @@ jobs:
   test:
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
           dotnet-version: '10.0.x'
       - run: ./scripts/build.ps1 -Configuration Release
@@ -28,8 +30,10 @@ jobs:
       matrix:
         runtime: [win-x64, win-arm64]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
           dotnet-version: '10.0.x'
       - name: Install Inno Setup
@@ -38,6 +42,9 @@ jobs:
           $setup = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.4.exe'
           $destination = Join-Path $env:RUNNER_TEMP 'PrintBridge-Inno'
           Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe' -OutFile $setup
+          if ((Get-FileHash -LiteralPath $setup).Hash -ne 'A549929319F9120716677C685535CA4671E4B937B5FDC87E2585F32D8EB30E8C') {
+              throw 'Inno Setup checksum verification failed'
+          }
           $signature = Get-AuthenticodeSignature $setup
           if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Pyrsys') {
               throw 'Inno Setup signature verification failed'
@@ -71,7 +78,7 @@ jobs:
               if (Test-Path $log) { Get-Content $log -Tail 80 }
               throw "MSI removal failed with exit code $($remove.ExitCode)"
           }
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: PrintBridge-${{ matrix.runtime }}
           path: artifacts/dist/${{ matrix.runtime }}/*

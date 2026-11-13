@@ -8,6 +8,9 @@
     <RootNamespace>PrintBridge</RootNamespace>
     <ApplicationIcon>Resources/PrintBridge.ico</ApplicationIcon>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(PrintBridgeSignedRelease)' == 'true'">
+    <DefineConstants>$(DefineConstants);SIGNED_RELEASE</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources/PrintBridge.ico" LogicalName="PrintBridge.AppIcon" />
     <ProjectReference Include="../PrintBridge.Infrastructure/PrintBridge.Infrastructure.csproj" />

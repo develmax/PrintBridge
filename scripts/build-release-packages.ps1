@@ -30,7 +30,8 @@ Copy-Item -LiteralPath $exe.FullName -Destination "$base.exe" -Force
 Compress-Archive -LiteralPath "$base.exe" -DestinationPath "$base.zip" -Force
 Push-Location (Join-Path $root 'installer')
 try {
-    & $Wix build -arch $arch -define "Arch=$arch" -define "BuildVersion=$version" -define "PublishDir=$publish" -define "UpgradeCode=$upgrade" -define "AppComponent=$app" -define "ShortcutComponent=$shortcut" -pdbtype none -out "$base.msi" PrintBridge.wxs
+    $signFlag = @(if ($Sign) { '-define'; 'SignedRelease=1' })
+    & $Wix build @signFlag -arch $arch -define "Arch=$arch" -define "BuildVersion=$version" -define "PublishDir=$publish" -define "UpgradeCode=$upgrade" -define "AppComponent=$app" -define "ShortcutComponent=$shortcut" -pdbtype none -out "$base.msi" PrintBridge.wxs
     if ($LASTEXITCODE -ne 0) { throw 'MSI compilation failed' }
 } finally { Pop-Location }
 if ($Sign) { & (Join-Path $PSScriptRoot 'sign-binary.ps1') "$base.msi" }
