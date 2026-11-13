@@ -14,6 +14,6 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources/PrintBridge.ico" LogicalName="PrintBridge.AppIcon" />
     <ProjectReference Include="../PrintBridge.Infrastructure/PrintBridge.Infrastructure.csproj" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
   </ItemGroup>
 </Project>
