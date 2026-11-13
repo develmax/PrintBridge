@@ -78,6 +78,8 @@ public sealed record LanAdapter(Guid Id, string Name, string Description, int In
 
 public sealed record PrinterQueue(string Name, string Driver, string Port, string? Host, string? Monitor, string Status, bool Local, bool Shared, string? Comment, bool? RawPort)
 {
+    public int? JobCount { get; init; }
+
     public override string ToString()
     {
         return $"{Name} · {Driver} · {Port}";

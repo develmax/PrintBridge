@@ -29,7 +29,13 @@ internal sealed class PreferencesForm : Form
     private readonly CheckBox verbose;
     private readonly CheckBox autoUpdate;
 
-    private readonly ComboBox language = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+    private readonly ComboBox language = new()
+    {
+        DropDownStyle = ComboBoxStyle.DropDownList,
+        Dock = DockStyle.Fill,
+        DisplayMember = nameof(LanguageOption.Name),
+        ValueMember = nameof(LanguageOption.Code)
+    };
 
     private readonly ComboBox wifi = new ComboBox
     {
@@ -54,7 +60,7 @@ internal sealed class PreferencesForm : Form
         AutoDiscover = search.Checked,
         Verbose = verbose.Checked,
         AutoUpdate = autoUpdate.Checked,
-        Language = language.SelectedIndex == 1 ? Russian : English,
+        Language = (string)language.SelectedValue!,
         Adapter = ((AdapterChoice)wifi.SelectedItem!).Id,
         IntervalSeconds = (int)interval.Value,
         LocalPort = (int)local.Value,
@@ -85,9 +91,9 @@ internal sealed class PreferencesForm : Form
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 49f));
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 51f));
         Controls.Add(body);
-        language.Items.AddRange(["English", "Русский"]);
-        language.SelectedIndex = settings.Language == Russian ? 1 : 0;
         Row(T("Language"), language);
+        language.DataSource = Languages.ToArray();
+        language.SelectedValue = Normalize(settings.Language);
         startup = Check(T("Start with Windows"), runAtStartup);
         hidden = Check(T("Start minimized to the tray"), settings.StartHidden);
         notify = Check(T("Show tray notifications"), settings.Notify);

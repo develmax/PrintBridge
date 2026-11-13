@@ -34,7 +34,7 @@ public sealed class InstallationIntegrationService(SettingsService settings, Sta
         start.ArgumentList.Add("--spooler");
         start.ArgumentList.Add(action);
         start.ArgumentList.Add(payload);
-        start.ArgumentList.Add(Normalize(System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName));
+        start.ArgumentList.Add(Normalize(System.Globalization.CultureInfo.CurrentUICulture.Name));
         try
         {
             using Process process = Process.Start(start) ?? throw new InvalidOperationException(T("Could not start the Windows print operation."));

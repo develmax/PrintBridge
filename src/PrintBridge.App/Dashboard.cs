@@ -33,22 +33,8 @@ internal sealed class Dashboard : Form
 
     private readonly CancellationTokenSource stop = new CancellationTokenSource();
 
-    private readonly Label headline = new Label
-    {
-        AutoSize = true,
-        MaximumSize = new Size(680, 0)
-    };
-
-    private readonly ToolTip portTip = new ToolTip();
-
-    private readonly Label[] values = new Label[3];
-    private readonly PictureBox headerIcon = new() { Size = new Size(32, 32), Margin = new Padding(3, 0, 9, 0) };
+    private readonly DashboardView view = new();
     private readonly Icon appIcon;
-    private Color indicatorColor;
-
-    private readonly TextBox bridgeDetails = ScrollableDetails(T("TCP bridge details"));
-
-    private readonly TextBox routeDetails = ScrollableDetails(T("Routing details"));
 
     private readonly ProgressBar progress = new ProgressBar
     {
@@ -58,25 +44,11 @@ internal sealed class Dashboard : Form
         Visible = false
     };
 
-    private readonly FlowLayoutPanel actions = new FlowLayoutPanel
-    {
-        Dock = DockStyle.Fill,
-        AutoSize = true,
-        AutoSizeMode = AutoSizeMode.GrowAndShrink,
-        Padding = new Padding(0, 0, 0, 5)
-    };
-
-    private readonly Button configure;
-    private readonly Button check;
-
-    private readonly Button test;
-
     private readonly ToolStripMenuItem restore;
     private readonly ToolStripMenuItem choosePrinter;
     private readonly ContextMenuStrip moreActions = new();
     private readonly Font commandIconFont = new("Segoe MDL2 Assets", 11f);
     private readonly Dictionary<ToolStripMenuItem, string> menuGlyphs = new();
-    private readonly Dictionary<Button, string> buttonGlyphs = new();
 
     private bool exiting;
 
@@ -133,82 +105,30 @@ internal sealed class Dashboard : Form
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(760, 620);
         MinimumSize = new Size(690, 560);
-        TableLayoutPanel body = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            AutoScroll = true,
-            ColumnCount = 1,
-            RowCount = 8,
-            Padding = new Padding(18, 18, 18, 6)
-        };
-        Controls.Add(body);
+        var host = new System.Windows.Forms.Integration.ElementHost { Dock = DockStyle.Fill, Child = view };
+        Controls.Add(host);
         Controls.Add(progress);
-        var header = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        headerIcon.Anchor = AnchorStyles.Left;
-        headerIcon.Paint += (_, e) =>
+        view.Language = System.Windows.Markup.XmlLanguage.GetLanguage(Normalize(Settings.Language));
+        view.Configure.Content = T("Connect Windows queue");
+        view.Check.Content = T("Check connection");
+        view.TestPage.Content = T("Print test page");
+        view.Preferences.Content = T("Settings");
+        view.More.Content = T("More");
+        view.QueueLabel.Text = T("Print queue");
+        view.NetworkLabel.Text = T("Local network");
+        view.Bridge.Header = T("Printer connection");
+        view.Routing.Header = T("Routing");
+        view.Configure.Click += async (_, _) => await ConfigureAsync();
+        view.Check.Click += async (_, _) => await CheckAsync(force: false);
+        view.TestPage.Click += async (_, _) => await TestPageAsync();
+        view.Preferences.Click += async (_, _) => await SettingsAsync();
+        view.More.Click += (_, _) =>
         {
-            var bounds = headerIcon.ClientRectangle;
-            e.Graphics.DrawIcon(appIcon, bounds);
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            int diameter = LogicalToDeviceUnits(11);
-            var badge = new Rectangle(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter);
-            using var outline = new SolidBrush(BackColor);
-            e.Graphics.FillEllipse(outline, badge);
-            badge.Inflate(-LogicalToDeviceUnits(1), -LogicalToDeviceUnits(1));
-            using var brush = new SolidBrush(StatusColor);
-            e.Graphics.FillEllipse(brush, badge);
+            var origin = view.More.PointToScreen(new System.Windows.Point(0, view.More.ActualHeight));
+            moreActions.Show(new Point((int)origin.X, (int)origin.Y));
         };
-        header.Controls.Add(headerIcon, 0, 0);
-        header.Controls.Add(new Label
-        {
-            Text = "PrintBridge",
-            Font = new Font(Font.FontFamily, 22f, FontStyle.Bold),
-            AutoSize = true,
-            Anchor = AnchorStyles.Left
-        }, 1, 0);
-        body.Controls.Add(header);
-        headline.Font = new Font(Font.FontFamily, 11f, FontStyle.Bold);
-        headline.Margin = new Padding(3, 12, 3, 8);
-        body.Controls.Add(headline);
-        body.Controls.Add(actions);
-        string[] sections = new string[3] { T("Windows queue"), T("Physical printer"), T("Local network") };
-        for (int index = 0; index < sections.Length; index++)
-        {
-            Label label = new Label
-            {
-                AutoSize = true,
-                MaximumSize = new Size(660, 0),
-                Padding = new Padding(4, 0, 4, 5)
-            };
-            values[index] = label;
-            GroupBox group = new GroupBox
-            {
-                Text = sections[index],
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                Padding = new Padding(8)
-            };
-            label.Dock = DockStyle.Top;
-            group.Controls.Add(label);
-            body.Controls.Add(group);
-        }
-        for (int row = 0; row < 6; row++)
-        {
-            body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        }
-        body.RowStyles.Add(new RowStyle(SizeType.Percent, 42f));
-        body.RowStyles.Add(new RowStyle(SizeType.Percent, 58f));
-        body.Controls.Add(DetailsSection(T("TCP bridge"), bridgeDetails));
-        body.Controls.Add(DetailsSection(T("Routing"), routeDetails));
-        configure = Add(T("Connect Windows queue"), ConfigureAsync, "\uE710");
-        check = Add(T("Check connection"), () => CheckAsync(force: false), "\uE72C");
-        test = Add(T("Print test page"), TestPageAsync, "\uE749");
-        Add(T("Settings"), SettingsAsync, "\uE713");
-        var more = Add(T("More"), "\uE712");
-        more.Click += (_, _) => moreActions.Show(more, new Point(0, more.Height));
-        more.ContextMenuStrip = moreActions;
+        view.QueueLink.Click += (_, _) => OpenPrintDialog("/o");
+        view.PrinterLink.Click += (_, _) => OpenPrintDialog("/p");
 
         choosePrinter = AddMenu(T("Choose another printer"), ConfigureAsync, "\uE749");
         AddMenu(T("Find printer"), () => CheckAsync(force: true), "\uE721");
@@ -230,65 +150,10 @@ internal sealed class Dashboard : Form
         Render();
     }
 
-    private static TextBox ScrollableDetails(string name)
-    {
-        return new TextBox
-        {
-            Dock = DockStyle.Fill,
-            Multiline = true,
-            ReadOnly = true,
-            WordWrap = true,
-            ScrollBars = ScrollBars.Vertical,
-            TabStop = true,
-            AccessibleName = name,
-            BorderStyle = BorderStyle.None,
-            BackColor = SystemColors.Control
-        };
-    }
-
-    private static GroupBox DetailsSection(string title, TextBox details)
-    {
-        return new GroupBox
-        {
-            Text = title,
-            Dock = DockStyle.Fill,
-            MinimumSize = new Size(0, 60),
-            Padding = new Padding(8),
-            Controls = { (Control?)details }
-        };
-    }
-
-    private Button Add(string title, Func<Task> click, string glyph)
-    {
-        var button = Add(title, glyph);
-        button.Click += async (_, _) => await click();
-        return button;
-    }
-
-    private Button Add(string title, string glyph)
-    {
-        Button button = new Button
-        {
-            Text = title,
-            AutoSize = true,
-            Padding = new Padding(6, 3, 6, 3),
-            TextImageRelation = TextImageRelation.ImageBeforeText
-        };
-        buttonGlyphs.Add(button, glyph);
-        actions.Controls.Add(button);
-        return button;
-    }
-
     private void RefreshCommandIcons()
     {
         int size = LogicalToDeviceUnits(18);
         moreActions.ImageScalingSize = new Size(size, size);
-        foreach (var (button, glyph) in buttonGlyphs)
-        {
-            var old = button.Image;
-            button.Image = CreateCommandIcon(glyph, size, SystemColors.ControlText);
-            old?.Dispose();
-        }
         foreach (var (item, glyph) in menuGlyphs)
         {
             var old = item.Image;
@@ -325,45 +190,78 @@ internal sealed class Dashboard : Form
     {
         MonitorState state = Monitor.State;
         PrintPlan? plan = Settings.Profile?.Print ?? Pending;
-        headline.Text = ((Pending != null) ? T("Setup did not finish. Restore the queue to continue.") : state.Message);
-        if (indicatorColor != StatusColor)
-        {
-            indicatorColor = StatusColor;
-            headerIcon.Invalidate();
-        }
-        string? currentPort = state.Queue?.Port;
-        bool usesBridge = plan is not null && SpoolerState.Same(currentPort, plan.PortName);
-        string portLabel = usesBridge && plan is { ShortPortName: false }
-            ? "PrintBridge" : currentPort ?? T("pending verification");
-        string portHint = usesBridge ? currentPort! : "";
-        if (portTip.GetToolTip(values[0]) != portHint)
-        {
-            portTip.SetToolTip(values[0], portHint);
-        }
-        values[0].Text = ((plan == null) ? T("No queue selected") : $"{plan.Queue} · {plan.Driver}\r\n{T("Current port")}: {portLabel} · {T("original")}: {plan.OriginalPort}");
-        NetworkPrinter? printer = state.Printer;
-        PrinterIdentity? identity = Settings.Profile?.Identity;
-        values[1].Text = ((printer == null && identity == null) ? T("No device selected") : $"{printer?.Model ?? identity?.Model ?? T("Unknown model")} · {printer?.Address.ToString() ?? identity?.LastAddress} · {printer?.Host ?? identity?.Host ?? T("unnamed")}\r\nMAC: {printer?.Mac ?? identity?.Mac ?? T("unavailable")} · {printer?.Source ?? T("saved profile")} · {T("last seen")}: {Monitor.LastSuccess?.ToString("g") ?? T("unavailable")}");
+        bool ready = state.Available && !state.Searching && Bridge.Running && Bridge.Target != null && Pending == null;
+        string? model = state.Printer?.Model ?? Settings.Profile?.Identity.Model;
+        view.PrinterName.Text = model ?? T("Physical printer");
+        view.QueueName.Text = plan?.Queue ?? T("No queue selected");
+        view.PrinterLink.IsEnabled = view.QueueLink.IsEnabled = plan != null;
+        view.StatusIcon.Text = ready ? "✓" : state.Searching ? "…" : plan == null ? "•" : "×";
+        view.ConnectionStatus.Text = ready ? T("Ready to print")
+            : state.Searching ? T("Checking connection…")
+            : plan == null ? T("No queue selected") : T("Printing unavailable");
+        var statusColor = ready ? "#215F42" : state.Searching || plan == null ? "#365776" : "#84283C";
+        view.ConnectionStatus.Foreground = view.StatusIcon.Foreground = BrushFromHex(statusColor);
+        view.StatusPill.Background = BrushFromHex(ready ? "#D8F3E2"
+            : state.Searching || plan == null ? "#DCE8F6" : "#FBE1E5");
+        view.FailureReason.Text = Pending != null ? T("Setup did not finish. Restore the queue to continue.")
+            : state.Message;
+        view.FailureReason.Visibility = VisibilityFor(!ready && !state.Searching);
+        view.QueueJobs.Text = state.Queue is { JobCount: int count } && SpoolerState.Same(state.Queue.Name, plan?.Queue)
+            ? F("Jobs in queue: {0}", count) : "";
+        view.QueueJobs.Visibility = VisibilityFor(view.QueueJobs.Text.Length != 0);
+        view.QueueDetails.Text = plan?.Driver ?? "";
+        view.QueueDetails.Visibility = VisibilityFor(plan != null);
         LanAdapter? adapter = state.Adapter;
-        values[2].Text = ((adapter == null) ? T("No active local network adapter verified") : $"{adapter} · {T("index")} {adapter.Index} · {T("metric")} {adapter.Metric} · {T("gateway")} {adapter.Gateway ?? T("none")}");
-        string text2 = $"{(Bridge.Running ? T("Running") : T("Stopped"))} · 127.0.0.1:{plan?.LocalPort ?? Settings.LocalPort} → {Bridge.Target?.Printer.Address.ToString() ?? T("waiting")}:9100 · {T("connections")} {Bridge.Active}";
-        string? error = Bridge.LastError;
-        string bridgeStatus = text2 + ((error != null) ? ($"\r\n{T("Last connection error")}: " + error) : "");
-        if (bridgeDetails.Text != bridgeStatus)
-        {
-            bridgeDetails.Text = bridgeStatus;
-        }
+        view.NetworkSummary.Text = adapter?.ToString() ?? T("No active local network adapter verified");
+        string bridgeStatus = $"{(Bridge.Running ? T("Running") : T("Stopped"))} · 127.0.0.1:{plan?.LocalPort ?? Settings.LocalPort} → {Bridge.Target?.Printer.Address.ToString() ?? T("waiting")}:9100 · {T("connections")} {Bridge.Active}";
+        if (Bridge.LastError is { } error)
+            bridgeStatus += $"\r\n{T("Last connection error")}: {error}";
+        if (plan != null)
+            bridgeStatus += $"\r\n{T("Current port")}: {state.Queue?.Port ?? T("pending verification")} · {T("original")}: {plan.OriginalPort}";
+        if (state.Printer is { } printer)
+            bridgeStatus += $"\r\nMAC: {printer.Mac ?? T("unavailable")} · {T("last seen")}: {Monitor.LastSuccess?.ToString("g") ?? T("unavailable")}";
+        if (view.BridgeSummary.Text != bridgeStatus)
+            view.BridgeSummary.Text = bridgeStatus;
         string route = state.Route ?? T("Route not checked yet");
-        if (routeDetails.Text != route)
-        {
-            routeDetails.Text = route;
-        }
-        configure.Visible = Settings.Profile == null && Pending == null;
-        check.Visible = test.Visible = Settings.Profile != null && Pending == null;
+        if (view.RouteSummary.Text != route)
+            view.RouteSummary.Text = route;
+        view.Configure.Visibility = VisibilityFor(Settings.Profile == null && Pending == null);
+        view.Check.Visibility = view.TestPage.Visibility = VisibilityFor(Settings.Profile != null && Pending == null);
         choosePrinter.Visible = Settings.Profile != null && Pending == null;
-        test.Enabled = !Busy && Bridge.Running && Bridge.Target != null && Pending == null;
+        view.TestPage.IsEnabled = !Busy && Bridge.Running && Bridge.Target != null && Pending == null;
         restore.Enabled = !Busy && plan != null;
         StatusChanged?.Invoke();
+    }
+
+    private static System.Windows.Visibility VisibilityFor(bool visible) =>
+        visible ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+
+    private static System.Windows.Media.Brush BrushFromHex(string value)
+    {
+        var brush = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(value)!;
+        brush.Freeze();
+        return brush;
+    }
+
+    private void OpenPrintDialog(string command)
+    {
+        var plan = Settings.Profile?.Print ?? Pending;
+        if (plan == null)
+            return;
+
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "rundll32.exe"))
+            {
+                UseShellExecute = false,
+                ArgumentList = { "printui.dll,PrintUIEntry", command, "/n", plan.Queue }
+            });
+        }
+        catch (System.ComponentModel.Win32Exception error)
+        {
+            logger.LogWarning(error, "Could not open the Windows print dialog");
+            MessageBox.Show(this, T("Could not open the Windows print dialog."), Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private async Task RunAsync(Func<Task> work, bool background = false)
@@ -372,7 +270,7 @@ internal sealed class Dashboard : Form
         {
             return;
         }
-        actions.Enabled = false;
+        view.IsEnabled = false;
         progress.Visible = true;
         TaskCompletionSource completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         operation = completion.Task;
@@ -396,7 +294,7 @@ internal sealed class Dashboard : Form
             operation = null;
             completion.SetResult();
             progress.Visible = false;
-            actions.Enabled = true;
+            view.IsEnabled = true;
             Render();
         }
     }
@@ -682,15 +580,12 @@ internal sealed class Dashboard : Form
     {
         if (disposing)
         {
-            portTip.Dispose();
             foreach (var item in menuGlyphs.Keys)
                 item.Image?.Dispose();
             moreActions.Dispose();
             commandIconFont.Dispose();
             Icon = null;
             appIcon.Dispose();
-            foreach (Button button in actions.Controls)
-                button.Image?.Dispose();
         }
         base.Dispose(disposing);
     }
