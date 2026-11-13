@@ -1,0 +1,99 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - run: ./scripts/build.ps1 -Configuration Release
+
+  installers:
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: windows-2025
+    strategy:
+      matrix:
+        runtime: [win-x64, win-arm64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.4.exe'
+          $destination = Join-Path $env:RUNNER_TEMP 'PrintBridge-Inno'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_4/innosetup-6.7.4.exe' -OutFile $setup
+          $signature = Get-AuthenticodeSignature $setup
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Pyrsys') {
+              throw 'Inno Setup signature verification failed'
+          }
+          $process = Start-Process $setup -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /CURRENTUSER /NORESTART /DIR=`"$destination`"" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Inno Setup exited with $($process.ExitCode)" }
+          "PRINTBRIDGE_ISCC=$(Join-Path $destination 'ISCC.exe')" >> $env:GITHUB_ENV
+      - name: Build installer
+        env:
+          PRINTBRIDGE_RUNTIME: ${{ matrix.runtime }}
+        shell: pwsh
+        run: |
+          ./scripts/build-installer.ps1 -Runtime $env:PRINTBRIDGE_RUNTIME
+          $directory = if ($env:PRINTBRIDGE_RUNTIME -eq 'win-arm64') { 'artifacts/installer/arm64' } else { 'artifacts/installer' }
+          New-Item -ItemType Directory -Force artifacts/dist | Out-Null
+          Copy-Item (Join-Path $directory 'PrintBridge-Setup.exe') "artifacts/dist/PrintBridge-Setup-$env:PRINTBRIDGE_RUNTIME.exe"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: PrintBridge-${{ matrix.runtime }}
+          path: artifacts/dist/*.exe
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: installers
+    runs-on: windows-2025
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: PrintBridge-win-*
+          path: dist
+          merge-multiple: true
+      - name: Publish GitHub Release
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content -Raw Directory.Build.props)).Project.PropertyGroup.Version
+          if ($env:GITHUB_REF_NAME -ne "v$version") { throw "Tag must match v$version" }
+          $installers = @(Get-ChildItem dist -Filter *.exe)
+          if ($installers.Count -ne 2) { throw 'Expected both Windows installers' }
+          $installers | Sort-Object Name | ForEach-Object {
+              "$( (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant() )  $($_.Name)"
+          } | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          $lines = Get-Content CHANGELOG.md
+          $heading = [array]::IndexOf($lines, "## $version")
+          if ($heading -lt 0) { throw "Missing changelog entry for $version" }
+          $notes = (($lines | Select-Object -Skip ($heading + 1)) -join "`n") -split '(?m)^## ', 2
+          $notes = $notes[0].Trim()
+          $notes | Set-Content -Encoding utf8 "$env:RUNNER_TEMP/printbridge-release.md"
+          $assets = (Get-ChildItem dist -File).FullName
+          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --title "PrintBridge $version" --notes-file "$env:RUNNER_TEMP/printbridge-release.md"
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release publication failed' }
