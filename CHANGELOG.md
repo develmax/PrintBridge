@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.8
+
+- Added printer discovery and printing through physical Ethernet adapters alongside Wi-Fi.
+- Added automatic adapter selection with preference for the last confirmed path and a manual adapter override.
+- Renamed the connection panel to **Local network** and identified the adapter type in routing diagnostics.
+
 ## 1.2.7
 
 - Verify the installed executable before starting the print bridge in signed releases. A failed check stops startup and records the error.

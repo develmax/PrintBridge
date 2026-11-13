@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace PrintBridge;
 
-public sealed record BridgeTarget(WifiAdapter Adapter, NetworkPrinter Printer, PrinterIdentity Identity);
+public sealed record BridgeTarget(LanAdapter Adapter, NetworkPrinter Printer, PrinterIdentity Identity);
 
 public sealed class TcpBridgeService : IAsyncDisposable, IDisposable
 {

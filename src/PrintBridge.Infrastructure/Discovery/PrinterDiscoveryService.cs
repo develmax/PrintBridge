@@ -12,7 +12,7 @@ namespace PrintBridge;
 
 public sealed class PrinterDiscoveryService(ILogger<PrinterDiscoveryService> logger)
 {
-    public async Task<IReadOnlyList<NetworkPrinter>> FindAsync(WifiAdapter adapter, IEnumerable<string> hints, bool scan, CancellationToken token)
+    public async Task<IReadOnlyList<NetworkPrinter>> FindAsync(LanAdapter adapter, IEnumerable<string> hints, bool scan, CancellationToken token)
     {
         Task<Advertisement[]> mdns = AdvertiseAsync(() => DiscoveryPackets.MdnsAsync(adapter, token), "mDNS", token);
         Task<Advertisement[]> wsd = AdvertiseAsync(() => DiscoveryPackets.WsdAsync(adapter, token), "WS-Discovery", token);
@@ -47,13 +47,13 @@ public sealed class PrinterDiscoveryService(ILogger<PrinterDiscoveryService> log
                 printers.Add(printer);
             }
         }).ConfigureAwait(continueOnCapturedContext: false);
-        logger.LogDebug("Discovery on Wi-Fi {Index}: {Count} candidates, mDNS {Mdns}, WSD {Wsd}", adapter.Index, printers.Count, mdns.Result.Length, wsd.Result.Length);
+        logger.LogDebug("Discovery on interface {Index}: {Count} candidates, mDNS {Mdns}, WSD {Wsd}", adapter.Index, printers.Count, mdns.Result.Length, wsd.Result.Length);
         return (from printer in printers
-            orderby printer.Raw descending, WifiAdapter.AddressNumber(printer.Address)
+            orderby printer.Raw descending, LanAdapter.AddressNumber(printer.Address)
             select printer).ToArray();
     }
 
-    public async Task<NetworkPrinter?> CheckAddressAsync(WifiAdapter adapter, IPAddress address, CancellationToken token)
+    public async Task<NetworkPrinter?> CheckAddressAsync(LanAdapter adapter, IPAddress address, CancellationToken token)
     {
         if (!RoutingDiagnosticsService.IsCandidate(adapter, address))
         {
@@ -62,19 +62,19 @@ public sealed class PrinterDiscoveryService(ILogger<PrinterDiscoveryService> log
         return await InspectAsync(adapter, address, Array.Empty<Advertisement>(), known: true, token).ConfigureAwait(continueOnCapturedContext: false);
     }
 
-    public async Task<NetworkPrinter> VerifyAddressAsync(WifiAdapter adapter, IPAddress address, PrinterIdentity identity, CancellationToken token)
+    public async Task<NetworkPrinter> VerifyAddressAsync(LanAdapter adapter, IPAddress address, PrinterIdentity identity, CancellationToken token)
     {
         string? mac = RoutingDiagnosticsService.Neighbor(adapter, address);
         if (identity.Mac != null && mac != null)
         {
-            return new NetworkPrinter(address, null, null, mac, null, null, Raw: true, Ipp: false, Lpr: false, T("Wi-Fi neighbor table"));
+            return new NetworkPrinter(address, null, null, mac, null, null, Raw: true, Ipp: false, Lpr: false, T("Network neighbor table"));
         }
         Advertisement[] matches = (await AdvertiseAsync(() => DiscoveryPackets.MdnsAsync(adapter, token), "mDNS", token).ConfigureAwait(continueOnCapturedContext: false)).Where((Advertisement ad) => ad.Address.Equals(address)).ToArray();
         Advertisement? ipp = await IppDiscovery.ProbeAsync(adapter, address, matches.Select((Advertisement ad) => ad.Resource).FirstOrDefault((string? resource) => resource != null), token).ConfigureAwait(continueOnCapturedContext: false);
         return new NetworkPrinter(address, null, ipp?.Model, mac, ipp?.Serial ?? Unique(matches.Select((Advertisement ad) => ad.Serial)), ipp?.Id ?? Unique(matches.Select((Advertisement ad) => ad.Id)), Raw: true, ipp != null, Lpr: false, (ipp == null) ? "DNS-SD" : "IPP");
     }
 
-    private static async Task<NetworkPrinter?> InspectAsync(WifiAdapter adapter, IPAddress address, Advertisement[] ads, bool known, CancellationToken token)
+    private static async Task<NetworkPrinter?> InspectAsync(LanAdapter adapter, IPAddress address, Advertisement[] ads, bool known, CancellationToken token)
     {
         Task<bool> task = ProbePortAsync(adapter, address, 9100, known ? 1800 : 550, token);
         Task<bool> ipp = ProbePortAsync(adapter, address, 631, known ? 1300 : 500, token);
@@ -143,7 +143,7 @@ public sealed class PrinterDiscoveryService(ILogger<PrinterDiscoveryService> log
         return found[0];
     }
 
-    private static async Task<bool> ProbePortAsync(WifiAdapter adapter, IPAddress address, int port, int timeout, CancellationToken token)
+    private static async Task<bool> ProbePortAsync(LanAdapter adapter, IPAddress address, int port, int timeout, CancellationToken token)
     {
         try
         {
@@ -166,12 +166,12 @@ public sealed class PrinterDiscoveryService(ILogger<PrinterDiscoveryService> log
         }
         catch (SocketException exception) when (!token.IsCancellationRequested)
         {
-            logger.LogWarning(exception, "{Protocol} is unavailable on Wi-Fi", protocol);
+            logger.LogWarning(exception, "{Protocol} is unavailable on the selected interface", protocol);
             return Array.Empty<Advertisement>();
         }
     }
 
-    private static async Task<IEnumerable<IPAddress>> ResolveHintsAsync(WifiAdapter adapter, IEnumerable<string> hints, CancellationToken token)
+    private static async Task<IEnumerable<IPAddress>> ResolveHintsAsync(LanAdapter adapter, IEnumerable<string> hints, CancellationToken token)
     {
         CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         try

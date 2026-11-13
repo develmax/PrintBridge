@@ -7,11 +7,19 @@ using System.Net.Sockets;
 
 namespace PrintBridge;
 
-public sealed record WifiAdapter(Guid Id, string Name, string Description, int Index, IPAddress Address, int Prefix, string? Gateway, string? Ssid, uint Metric)
+public sealed record LanAdapter(Guid Id, string Name, string Description, int Index, IPAddress Address, int Prefix, string? Gateway, string? Ssid, uint Metric, bool IsWireless = true)
 {
+    public string ConnectionType => IsWireless ? "Wi-Fi" : "Ethernet";
+
+    public static LanAdapter[] OrderForPrinter(IEnumerable<LanAdapter> adapters, Guid? selected, Guid? preferred, IPAddress? address) =>
+        adapters.Where(adapter => selected == null || adapter.Id == selected)
+            .OrderByDescending(adapter => address != null && adapter.Contains(address))
+            .ThenByDescending(adapter => adapter.Id == preferred)
+            .ToArray();
+
     public override string ToString()
     {
-        return $"{Name} · {Ssid ?? Description} · {Address}/{Prefix}";
+        return $"{ConnectionType} · {Name} · {Ssid ?? Description} · {Address}/{Prefix}";
     }
 
     public bool Contains(IPAddress address)
@@ -191,6 +199,6 @@ public sealed record PrintPlan(Guid Id, string SourceQueue, string Queue, string
     }
 }
 
-public sealed record Profile(PrintPlan Print, PrinterIdentity Identity);
+public sealed record Profile(PrintPlan Print, PrinterIdentity Identity, Guid? LastAdapter = null);
 
 public sealed record AppSettings(bool StartHidden = true, bool Notify = true, bool AutoDiscover = true, int IntervalSeconds = 300, Guid? Adapter = null, int LocalPort = 19100, int ConnectSeconds = 4, int IdleSeconds = 120, int MaxConnections = 4, bool Verbose = false, Profile? Profile = null, string? Language = null, bool AutoUpdate = true, bool IdleIntervalConfigured = false);

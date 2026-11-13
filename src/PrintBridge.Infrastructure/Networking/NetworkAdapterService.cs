@@ -14,22 +14,39 @@ namespace PrintBridge;
 
 public sealed class NetworkAdapterService
 {
-    public IReadOnlyList<WifiAdapter> GetAdapters()
+    public IReadOnlyList<LanAdapter> GetAdapters()
     {
-        Dictionary<Guid, string?> wlan = ConnectedWlan();
-        return (from adapter in (from nic in NetworkInterface.GetAllNetworkInterfaces()
-                where nic.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && nic.OperationalStatus == OperationalStatus.Up && Guid.TryParse(nic.Id, out var result) && wlan.ContainsKey(result) && !nic.Description.Contains("virtual", StringComparison.OrdinalIgnoreCase)
-                select nic).SelectMany((NetworkInterface nic) =>
+        Dictionary<Guid, string?> wlan;
+        try { wlan = ConnectedWlan(); }
+        catch (Win32Exception) { wlan = new(); }
+
+        var adapters = new List<LanAdapter>();
+        foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            bool wireless = nic.NetworkInterfaceType == NetworkInterfaceType.Wireless80211;
+            bool wired = nic.NetworkInterfaceType is NetworkInterfaceType.Ethernet or NetworkInterfaceType.Ethernet3Megabit
+                or NetworkInterfaceType.FastEthernetFx or NetworkInterfaceType.FastEthernetT or NetworkInterfaceType.GigabitEthernet;
+            if ((!wireless && !wired) || nic.OperationalStatus != OperationalStatus.Up ||
+                !Guid.TryParse(nic.Id, out var id) || !nic.Supports(NetworkInterfaceComponent.IPv4) ||
+                nic.Description.Contains("virtual", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var properties = nic.GetIPProperties();
+            int index = properties.GetIPv4Properties().Index;
+            if (!RoutingDiagnosticsService.IsHardware(index))
+                continue;
+            var gateway = properties.GatewayAddresses.FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork);
+            uint metric = RoutingDiagnosticsService.GetMetric(index);
+            foreach (var ip in properties.UnicastAddresses)
             {
-                IPInterfaceProperties properties = nic.GetIPProperties();
-                Guid id = Guid.Parse(nic.Id);
-                int index = properties.GetIPv4Properties().Index;
-                return (!RoutingDiagnosticsService.IsHardware(index)) ? Enumerable.Empty<WifiAdapter>() : (from ip in properties.UnicastAddresses
-                    where ip.Address.AddressFamily == AddressFamily.InterNetwork && ip.PrefixLength > 0 && !((ReadOnlySpan<byte>)ip.Address.GetAddressBytes().AsSpan()).StartsWith((ReadOnlySpan<byte>)new byte[2] { 169, 254 })
-                    select new WifiAdapter(id, nic.Name, nic.Description, index, ip.Address, ip.PrefixLength, properties.GatewayAddresses.FirstOrDefault((GatewayIPAddressInformation g) => g.Address.AddressFamily == AddressFamily.InterNetwork)?.Address.ToString(), wlan[id], RoutingDiagnosticsService.GetMetric(index)));
-            })
-            orderby adapter.Gateway != null descending, adapter.Metric, adapter.Index
-            select adapter).ToArray();
+                if (ip.Address.AddressFamily == AddressFamily.InterNetwork && ip.PrefixLength > 0 &&
+                    !ip.Address.GetAddressBytes().AsSpan().StartsWith(new byte[] { 169, 254 }))
+                    adapters.Add(new LanAdapter(id, nic.Name, nic.Description, index, ip.Address, ip.PrefixLength,
+                        gateway?.Address.ToString(), wlan.GetValueOrDefault(id), metric, wireless));
+            }
+        }
+        return adapters.OrderByDescending(adapter => adapter.Gateway != null)
+            .ThenBy(adapter => adapter.Metric).ThenBy(adapter => adapter.Index).ToArray();
     }
 
     private static Dictionary<Guid, string?> ConnectedWlan()
@@ -193,13 +210,13 @@ public sealed class RoutingDiagnosticsService
         public uint Metric;
     }
 
-    public static void Pin(Socket socket, WifiAdapter adapter)
+    public static void Pin(Socket socket, LanAdapter adapter)
     {
         socket.SetSocketOption(SocketOptionLevel.IP, (SocketOptionName)31, IPAddress.HostToNetworkOrder(adapter.Index));
         socket.Bind(new IPEndPoint(adapter.Address, 0));
     }
 
-    public static async Task<TcpClient> ConnectAsync(WifiAdapter adapter, IPAddress address, int port, TimeSpan timeout, CancellationToken cancellationToken)
+    public static async Task<TcpClient> ConnectAsync(LanAdapter adapter, IPAddress address, int port, TimeSpan timeout, CancellationToken cancellationToken)
     {
         if (!IsCandidate(adapter, address))
         {
@@ -226,13 +243,13 @@ public sealed class RoutingDiagnosticsService
         }
     }
 
-    public static bool IsCandidate(WifiAdapter adapter, IPAddress address)
+    public static bool IsCandidate(LanAdapter adapter, IPAddress address)
     {
         if (!adapter.Contains(address) || IPAddress.IsLoopback(address) || address.Equals(adapter.Address))
         {
             return false;
         }
-        uint value = WifiAdapter.AddressNumber(address);
+        uint value = LanAdapter.AddressNumber(address);
         if (value >> 28 >= 14 || value >> 24 == 0)
         {
             return false;
@@ -248,7 +265,7 @@ public sealed class RoutingDiagnosticsService
         return true;
     }
 
-    public static string? Neighbor(WifiAdapter adapter, IPAddress address)
+    public static string? Neighbor(LanAdapter adapter, IPAddress address)
     {
         if (!IsCandidate(adapter, address))
         {
@@ -267,7 +284,7 @@ public sealed class RoutingDiagnosticsService
         return Convert.ToHexString(row.PhysicalAddress.AsSpan(0, 6));
     }
 
-    public string Describe(WifiAdapter? adapter, IPAddress? address)
+    public string Describe(LanAdapter? adapter, IPAddress? address)
     {
         IEnumerable<NetworkInterface> tunnels = NetworkInterface.GetAllNetworkInterfaces().Where((NetworkInterface nic) =>
         {
@@ -292,8 +309,8 @@ public sealed class RoutingDiagnosticsService
             SockAddr source = SockAddr.From(adapter.Address);
             int pinned = GetBestRoute2(IntPtr.Zero, (uint)adapter.Index, ref source, ref destination, 0u, out var best, out _);
             lines.Add(pinned == 0
-                ? F("PrintBridge Wi-Fi route: interface {0}, metric {1}", best.Index, best.Metric)
-                : F("PrintBridge Wi-Fi route: interface {0}, Windows error {1}", adapter.Index, pinned));
+                ? F("PrintBridge route via {0}: interface {1}, metric {2}", adapter.ConnectionType, best.Index, best.Metric)
+                : F("PrintBridge route via {0}: interface {1}, Windows error {2}", adapter.ConnectionType, adapter.Index, pinned));
             int error = GetBestInterfaceEx(ref destination, out var index);
             lines.Add(error == 0
                 ? F("Windows default route to the printer: interface {0}", index)

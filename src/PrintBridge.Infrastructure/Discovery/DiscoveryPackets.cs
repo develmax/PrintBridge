@@ -15,7 +15,7 @@ internal static class DiscoveryPackets
     private static readonly string[] Services =
         ["_ipp._tcp.local", "_ipps._tcp.local", "_printer._tcp.local", "_pdl-datastream._tcp.local"];
 
-    public static async Task<Advertisement[]> MdnsAsync(WifiAdapter adapter, CancellationToken token)
+    public static async Task<Advertisement[]> MdnsAsync(LanAdapter adapter, CancellationToken token)
     {
         var records = new List<DnsRecord>();
         await ReceiveAsync(adapter, "224.0.0.251", 5353, DnsQuery(), result =>
@@ -43,7 +43,7 @@ internal static class DiscoveryPackets
                 }))).Distinct().ToArray();
     }
 
-    public static async Task<Advertisement[]> WsdAsync(WifiAdapter adapter, CancellationToken token)
+    public static async Task<Advertisement[]> WsdAsync(LanAdapter adapter, CancellationToken token)
     {
         var results = new List<Advertisement>();
         string id = $"urn:uuid:{Guid.NewGuid()}";
@@ -84,7 +84,7 @@ internal static class DiscoveryPackets
         return results.Distinct().ToArray();
     }
 
-    private static async Task ReceiveAsync(WifiAdapter adapter, string group, int port, byte[] message,
+    private static async Task ReceiveAsync(LanAdapter adapter, string group, int port, byte[] message,
         Action<UdpReceiveResult> receive, CancellationToken token)
     {
         using var udp = new UdpClient(AddressFamily.InterNetwork);

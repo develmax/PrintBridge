@@ -152,15 +152,15 @@ public sealed class InstallationIntegrationService(SettingsService settings, Sta
     {
         Dictionary<string, object> result = new Dictionary<string, object>();
         bool failed = false;
-        IReadOnlyList<WifiAdapter> wifi = Array.Empty<WifiAdapter>();
+        IReadOnlyList<LanAdapter> networks = Array.Empty<LanAdapter>();
         try
         {
-            wifi = adapters.GetAdapters();
-            result["Wifi"] = wifi.Count;
+            networks = adapters.GetAdapters();
+            result["NetworkAdapters"] = networks.Count;
         }
         catch (Exception ex)
         {
-            result["WifiError"] = ex.Message;
+            result["NetworkAdapterError"] = ex.Message;
             failed = true;
         }
         try
@@ -170,7 +170,7 @@ public sealed class InstallationIntegrationService(SettingsService settings, Sta
             result["Ports"] = state.Ports.Count;
             if (checkNetwork)
             {
-                WifiAdapter? adapter = wifi.FirstOrDefault();
+                LanAdapter? adapter = networks.FirstOrDefault();
                 if (adapter != null)
                 {
                     using CancellationTokenSource timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25L));
@@ -181,7 +181,7 @@ public sealed class InstallationIntegrationService(SettingsService settings, Sta
                     result["KnownRawQueues"] = hints.Length;
                     result["RawCandidates"] = Enumerable.Count(devices, (NetworkPrinter printer) => printer.Raw);
                     result["IdentifiedRawCandidates"] = Enumerable.Count(devices, (NetworkPrinter printer) => printer.Raw && PrinterIdentity.Confirm(printer).IsTrackable);
-                    result["WifiMetric"] = adapter.Metric;
+                    result["InterfaceMetric"] = adapter.Metric;
                     NetworkPrinter? raw = devices.FirstOrDefault((NetworkPrinter printer) => printer.Raw);
                     if (raw != null)
                     {

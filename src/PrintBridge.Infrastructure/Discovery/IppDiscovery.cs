@@ -6,7 +6,7 @@ namespace PrintBridge;
 
 internal static class IppDiscovery
 {
-    public static async Task<Advertisement?> ProbeAsync(WifiAdapter adapter, IPAddress address, string? resource, CancellationToken token)
+    public static async Task<Advertisement?> ProbeAsync(LanAdapter adapter, IPAddress address, string? resource, CancellationToken token)
     {
         resource = (resource ?? "ipp/print").TrimStart('/');
         if (resource.Length is < 1 or > 200 || resource.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '/' and not '-' and not '_' and not '.'))

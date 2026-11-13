@@ -13,7 +13,7 @@ public sealed class BridgeTests
 {
 	private static BridgeTarget Destination(byte address = 2)
 	{
-		WifiAdapter wifi = new WifiAdapter(Guid.NewGuid(), "Wi-Fi", "Test", 1, IPAddress.Parse("10.1.2.1"), 24, null, null, 1u);
+		LanAdapter wifi = new LanAdapter(Guid.NewGuid(), "Wi-Fi", "Test", 1, IPAddress.Parse("10.1.2.1"), 24, null, null, 1u);
 		NetworkPrinter device = new NetworkPrinter(new IPAddress(new byte[4] { 10, 1, 2, address }), null, null, "010203040506", null, null, Raw: true, Ipp: false, Lpr: false, "fixture");
 		return new BridgeTarget(wifi, device, PrinterIdentity.Confirm(device));
 	}
