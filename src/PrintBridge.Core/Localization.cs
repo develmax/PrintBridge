@@ -13,6 +13,7 @@ public static class Localization
     public static IReadOnlyList<LanguageOption> Languages { get; } = Array.AsReadOnly<LanguageOption>(
     [
         new(English, "English"),
+        new("ar", "العربية"),
         new("de", "Deutsch"),
         new("es", "Español"),
         new("fr", "Français"),

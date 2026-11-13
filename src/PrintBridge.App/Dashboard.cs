@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,19 +35,8 @@ internal sealed class Dashboard : Form
     private readonly DashboardView view = new();
     private readonly Icon appIcon;
 
-    private readonly ProgressBar progress = new ProgressBar
-    {
-        Dock = DockStyle.Top,
-        Height = 4,
-        Style = ProgressBarStyle.Marquee,
-        Visible = false
-    };
-
-    private readonly ToolStripMenuItem restore;
-    private readonly ToolStripMenuItem choosePrinter;
-    private readonly ContextMenuStrip moreActions = new();
-    private readonly Font commandIconFont = new("Segoe MDL2 Assets", 11f);
-    private readonly Dictionary<ToolStripMenuItem, string> menuGlyphs = new();
+    private readonly System.Windows.Controls.MenuItem restore;
+    private readonly System.Windows.Controls.MenuItem choosePrinter;
 
     private bool exiting;
 
@@ -103,13 +91,15 @@ internal sealed class Dashboard : Form
         Icon = appIcon;
         AutoScaleMode = AutoScaleMode.Dpi;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(760, 620);
+        ClientSize = new Size(760, 660);
         MinimumSize = new Size(690, 560);
+        MaximizeBox = false;
         var host = new System.Windows.Forms.Integration.ElementHost { Dock = DockStyle.Fill, Child = view };
         Controls.Add(host);
-        Controls.Add(progress);
         view.Language = System.Windows.Markup.XmlLanguage.GetLanguage(Normalize(Settings.Language));
-        view.Configure.Content = T("Connect Windows queue");
+        if (System.Globalization.CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft)
+            view.FlowDirection = System.Windows.FlowDirection.RightToLeft;
+        view.Configure.Content = T("Connect");
         view.Check.Content = T("Check connection");
         view.TestPage.Content = T("Print test page");
         view.Preferences.Content = T("Settings");
@@ -124,8 +114,9 @@ internal sealed class Dashboard : Form
         view.Preferences.Click += async (_, _) => await SettingsAsync();
         view.More.Click += (_, _) =>
         {
-            var origin = view.More.PointToScreen(new System.Windows.Point(0, view.More.ActualHeight));
-            moreActions.Show(new Point((int)origin.X, (int)origin.Y));
+            view.MoreMenu.PlacementTarget = view.More;
+            view.MoreMenu.FlowDirection = view.FlowDirection;
+            view.MoreMenu.IsOpen = true;
         };
         view.QueueLink.Click += (_, _) => OpenPrintDialog("/o");
         view.PrinterLink.Click += (_, _) => OpenPrintDialog("/p");
@@ -134,7 +125,7 @@ internal sealed class Dashboard : Form
         AddMenu(T("Find printer"), () => CheckAsync(force: true), "\uE721");
         AddMenu(T("Restart bridge"), RestartAsync, "\uE72C");
         restore = AddMenu(T("Restore original port"), RestoreAsync, "\uE7A7");
-        moreActions.Items.Add(new ToolStripSeparator());
+        view.MoreMenu.Items.Add(new System.Windows.Controls.Separator { Background = BrushFromHex("#CEDBEC") });
         AddMenu(T("Diagnostics"), ExportAsync, "\uE9D9");
         AddMenu(T("Report a bug"), ReportBugAsync, "\uE939");
         AddMenu(T("Open logs"), () =>
@@ -142,47 +133,27 @@ internal sealed class Dashboard : Form
             OpenLogs();
             return Task.CompletedTask;
         }, "\uE8B7");
-        AddMenu(T("About"), () => { using var about = new AboutForm(); about.ShowDialog(this); return Task.CompletedTask; }, "\uE946");
-        RefreshCommandIcons();
-        DpiChanged += (_, _) => RefreshCommandIcons();
-        SystemColorsChanged += (_, _) => RefreshCommandIcons();
+        AddMenu(T("About"), () => { new AboutWindow().ShowOwned(Handle); return Task.CompletedTask; }, "\uE946");
         Monitor.Changed += Render;
         Render();
     }
 
-    private void RefreshCommandIcons()
+    private System.Windows.Controls.MenuItem AddMenu(string title, Func<Task> click, string glyph)
     {
-        int size = LogicalToDeviceUnits(18);
-        moreActions.ImageScalingSize = new Size(size, size);
-        foreach (var (item, glyph) in menuGlyphs)
+        var item = new System.Windows.Controls.MenuItem
         {
-            var old = item.Image;
-            item.Image = CreateCommandIcon(glyph, size, SystemColors.MenuText);
-            old?.Dispose();
-        }
-    }
-
-    private Bitmap CreateCommandIcon(string glyph, int size, Color color)
-    {
-        var image = new Bitmap(size, size);
-        using var graphics = Graphics.FromImage(image);
-        using var path = new GraphicsPath();
-        path.AddString(glyph, commandIconFont.FontFamily, (int)FontStyle.Regular, size * 0.8f, PointF.Empty, StringFormat.GenericTypographic);
-        RectangleF bounds = path.GetBounds();
-        using var brush = new SolidBrush(color);
-        graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        graphics.TranslateTransform((size - bounds.Width) / 2 - bounds.X, (size - bounds.Height) / 2 - bounds.Y);
-        graphics.FillPath(brush, path);
-        return image;
-    }
-
-    private ToolStripMenuItem AddMenu(string title, Func<Task> click, string glyph)
-    {
-        var item = new ToolStripMenuItem(title);
+            Header = title,
+            Style = (System.Windows.Style)view.FindResource("MoreMenuItem"),
+            Icon = new System.Windows.Controls.TextBlock
+            {
+                Text = glyph,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"),
+                Foreground = BrushFromHex("#365776"),
+                FlowDirection = System.Windows.FlowDirection.LeftToRight
+            }
+        };
         item.Click += async (_, _) => await click();
-        menuGlyphs.Add(item, glyph);
-        moreActions.Items.Add(item);
+        view.MoreMenu.Items.Add(item);
         return item;
     }
 
@@ -192,7 +163,7 @@ internal sealed class Dashboard : Form
         PrintPlan? plan = Settings.Profile?.Print ?? Pending;
         bool ready = state.Available && !state.Searching && Bridge.Running && Bridge.Target != null && Pending == null;
         string? model = state.Printer?.Model ?? Settings.Profile?.Identity.Model;
-        view.PrinterName.Text = model ?? T("Physical printer");
+        view.PrinterName.Text = model ?? T("Printer");
         view.QueueName.Text = plan?.Queue ?? T("No queue selected");
         view.PrinterLink.IsEnabled = view.QueueLink.IsEnabled = plan != null;
         view.StatusIcon.Text = ready ? "✓" : state.Searching ? "…" : plan == null ? "•" : "×";
@@ -205,7 +176,8 @@ internal sealed class Dashboard : Form
             : state.Searching || plan == null ? "#DCE8F6" : "#FBE1E5");
         view.FailureReason.Text = Pending != null ? T("Setup did not finish. Restore the queue to continue.")
             : state.Message;
-        view.FailureReason.Visibility = VisibilityFor(!ready && !state.Searching);
+        view.FailureReason.Visibility = !ready && !state.Searching
+            ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
         view.QueueJobs.Text = state.Queue is { JobCount: int count } && SpoolerState.Same(state.Queue.Name, plan?.Queue)
             ? F("Jobs in queue: {0}", count) : "";
         view.QueueJobs.Visibility = VisibilityFor(view.QueueJobs.Text.Length != 0);
@@ -227,9 +199,9 @@ internal sealed class Dashboard : Form
             view.RouteSummary.Text = route;
         view.Configure.Visibility = VisibilityFor(Settings.Profile == null && Pending == null);
         view.Check.Visibility = view.TestPage.Visibility = VisibilityFor(Settings.Profile != null && Pending == null);
-        choosePrinter.Visible = Settings.Profile != null && Pending == null;
+        choosePrinter.Visibility = VisibilityFor(Settings.Profile != null && Pending == null);
         view.TestPage.IsEnabled = !Busy && Bridge.Running && Bridge.Target != null && Pending == null;
-        restore.Enabled = !Busy && plan != null;
+        restore.IsEnabled = !Busy && plan != null;
         StatusChanged?.Invoke();
     }
 
@@ -264,14 +236,18 @@ internal sealed class Dashboard : Form
         }
     }
 
-    private async Task RunAsync(Func<Task> work, bool background = false)
+    private async Task RunAsync(Func<Task> work, bool background = false, bool showProgress = true)
     {
         if (Busy || exiting)
         {
             return;
         }
         view.IsEnabled = false;
-        progress.Visible = true;
+        if (showProgress)
+        {
+            view.CheckProgress.Visibility = System.Windows.Visibility.Visible;
+            view.CheckProgress.IsIndeterminate = true;
+        }
         TaskCompletionSource completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         operation = completion.Task;
         try
@@ -293,7 +269,8 @@ internal sealed class Dashboard : Form
         {
             operation = null;
             completion.SetResult();
-            progress.Visible = false;
+            view.CheckProgress.IsIndeterminate = false;
+            view.CheckProgress.Visibility = System.Windows.Visibility.Hidden;
             view.IsEnabled = true;
             Render();
         }
@@ -333,8 +310,8 @@ internal sealed class Dashboard : Form
             {
                 throw new InvalidOperationException(T("Restore the queue from the incomplete setup first."));
             }
-            using SetupForm wizard = new SetupForm(adapters, windows, discovery, identities, Settings, stop.Token);
-            if (wizard.ShowDialog(this) == DialogResult.OK)
+            var wizard = new SetupWindow(adapters, windows, discovery, identities, Settings, stop.Token);
+            if (wizard.ShowOwned(Handle) == true)
             {
                 SetupSelection? selection = wizard.Selection;
                 if (selection != null)
@@ -366,7 +343,7 @@ internal sealed class Dashboard : Form
                     storage.ClearPending();
                     Pending = null;
                     await RefreshAsync(force: true);
-                    if (Monitor.State.Available && !exiting && MessageBox.Show(this, T("Queue connected. Print a Windows test page?"), Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                    if (Monitor.State.Available && !exiting && MessageBox.Show(this, T("Queue connected. Print a test page?"), Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                     {
                         await SubmitTestPageAsync(plan.Queue);
                     }
@@ -459,11 +436,12 @@ internal sealed class Dashboard : Form
         return RunAsync(async () =>
         {
             IReadOnlyList<LanAdapter> list = await Task.Run((Func<IReadOnlyList<LanAdapter>>)adapters.GetAdapters, stop.Token);
-            using PreferencesForm dialog = new(Settings, startup.Enabled, list, diagnostics.Clean,
+            var dialog = new PreferencesWindow(Settings, startup.Enabled, list, diagnostics.Clean,
                 owner => CheckUpdatesRequested?.Invoke(owner) ?? Task.CompletedTask);
-            var result = dialog.ShowDialog(this);
+            new System.Windows.Interop.WindowInteropHelper(dialog).Owner = Handle;
+            bool? result = dialog.ShowDialog();
             SettingsClosed?.Invoke();
-            if (result == DialogResult.OK)
+            if (result == true)
             {
                 AppSettings before = Settings;
                 Save(dialog.Value);
@@ -483,7 +461,7 @@ internal sealed class Dashboard : Form
                 }
                 await RefreshAsync(force: true);
             }
-        });
+        }, showProgress: false);
     }
 
     private void Save(AppSettings value)
@@ -531,8 +509,8 @@ internal sealed class Dashboard : Form
 
     private Task ReportBugAsync() => RunAsync(() =>
     {
-        using var dialog = new BugReportForm(DiagnosticsService.FormatReport(CreateReport(includeIdentifiers: false)));
-        dialog.ShowDialog(this);
+        var dialog = new BugReportWindow(DiagnosticsService.FormatReport(CreateReport(includeIdentifiers: false)));
+        dialog.ShowOwned(Handle);
         return Task.CompletedTask;
     });
 
@@ -580,10 +558,6 @@ internal sealed class Dashboard : Form
     {
         if (disposing)
         {
-            foreach (var item in menuGlyphs.Keys)
-                item.Image?.Dispose();
-            moreActions.Dispose();
-            commandIconFont.Dispose();
             Icon = null;
             appIcon.Dispose();
         }

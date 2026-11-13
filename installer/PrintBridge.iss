@@ -39,6 +39,7 @@ VersionInfoVersion={#BuildVersion}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "arabic"; MessagesFile: "compiler:Languages\Arabic.isl"
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
@@ -67,6 +68,12 @@ english.MsiInstalled=PrintBridge was installed with MSI. Use the MSI package to 
 russian.MsiInstalled=PrintBridge установлен из MSI. Используйте MSI-пакет для обновления.
 
 english.AppLanguage=en
+arabic.AppLanguage=ar
+arabic.AutoStart=تشغيل PrintBridge عند تسجيل الدخول إلى Windows
+arabic.StartApp=تشغيل PrintBridge
+arabic.CloseFailure=PrintBridge مشغول. انتظر انتهاء العملية الحالية ثم أعد محاولة التثبيت.
+arabic.CleanupFailure=توقفت عملية إلغاء تثبيت PrintBridge. تحقق من حالة قائمة الانتظار في PrintBridge ثم أعد المحاولة.
+arabic.MsiInstalled=تم تثبيت PrintBridge باستخدام MSI. استخدم حزمة MSI لتحديثه.
 russian.AppLanguage=ru
 german.AppLanguage=de
 german.AutoStart=Starten Sie PrintBridge, wenn Sie sich bei Windows anmelden

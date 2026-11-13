@@ -19,7 +19,7 @@ PrintBridge is a Windows utility that routes RAW printing to a network printer o
 
 ## Getting started
 
-1. Download the installer for your architecture. The installer includes the .NET runtime. Choose your preferred language in EXE setup or in PrintBridge under **Settings → Language**.
+1. Download the installer for your architecture. The installer includes the .NET runtime. Choose your preferred language in EXE setup or in PrintBridge under **Settings → General → Language**.
 2. Turn on the printer, connect the PC to the same local network, and open PrintBridge. Use **Automatic** to search connected Wi-Fi and Ethernet adapters, or select an adapter manually. Select the print queue and verify the physical printer.
 3. Choose **Create a separate queue** to keep the original queue available or **Switch the selected queue** to keep using its existing name. Approve the Windows request to change the queue or create its port.
 4. Print a test page and check the physical output. For normal printing, select the print queue you connected in the wizard.

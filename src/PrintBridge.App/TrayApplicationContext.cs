@@ -265,7 +265,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 using var checkDeadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
                 checkDeadline.CancelAfter(TimeSpan.FromSeconds(15));
                 var available = await updates.CheckAsync(current, msi, checkDeadline.Token);
-                if (closing || owner is Form { IsDisposed: true })
+                if (closing || owner?.Handle == IntPtr.Zero)
                     return;
                 if (available == null)
                 {
@@ -311,7 +311,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Update did not start");
-            if (owner != null && !closing && owner is not Form { IsDisposed: true })
+            if (owner != null && !closing && owner.Handle != IntPtr.Zero)
                 ShowUpdateMessage(owner, T("Could not check for updates. Try again later."), MessageBoxIcon.Warning);
         }
         finally
