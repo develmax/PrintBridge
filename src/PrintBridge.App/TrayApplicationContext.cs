@@ -39,6 +39,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private DateTimeOffset nextUpdate = DateTimeOffset.UtcNow.AddMinutes(1);
     private bool checkingUpdate;
     private bool preparingUpdate;
+    private Version? queuedUpdate;
+    private bool updateApproved;
 
     private readonly ILogger logger;
 
@@ -59,6 +61,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge");
         windows = services.GetRequiredService<WindowsPrinterService>();
         dashboard = ActivatorUtilities.CreateInstance<Dashboard>(services, Array.Empty<object>());
+        dashboard.CheckUpdatesRequested += CheckForUpdateAsync;
+        dashboard.SettingsClosed += () =>
+        {
+            if (queuedUpdate != null)
+                nextUpdate = DateTimeOffset.UtcNow;
+        };
         ContextMenuStrip menu = new ContextMenuStrip
         {
             Items =
@@ -197,7 +205,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         if (preparingUpdate)
             return;
-        if (dashboard.Settings.AutoUpdate && !checkingUpdate && DateTimeOffset.UtcNow >= nextUpdate)
+        if ((dashboard.Settings.AutoUpdate || updateApproved) && !checkingUpdate &&
+            (queuedUpdate == null || !dashboard.Busy) && DateTimeOffset.UtcNow >= nextUpdate)
             _ = CheckForUpdateAsync();
         dashboard.Render();
         if (!dashboard.Busy && dashboard.Pending == null && dashboard.Settings.Profile != null && !dashboard.Monitor.Paused)
@@ -213,14 +222,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private async Task<bool> CanUpdateAsync()
     {
-        if (closing || !dashboard.Settings.AutoUpdate || dashboard.Busy || dashboard.Pending != null || dashboard.Bridge.Active != 0)
+        if (closing || !(dashboard.Settings.AutoUpdate || updateApproved) || dashboard.Busy || dashboard.Pending != null || dashboard.Bridge.Active != 0)
             return false;
 
         var profile = dashboard.Settings.Profile;
         try
         {
             return (profile == null || !await Task.Run(() => windows.HasJobs(profile.Print.Queue))) &&
-                !closing && dashboard.Settings.AutoUpdate && !dashboard.Busy && dashboard.Pending == null &&
+                !closing && (dashboard.Settings.AutoUpdate || updateApproved) && !dashboard.Busy && dashboard.Pending == null &&
                 dashboard.Settings.Profile == profile && dashboard.Bridge.Active == 0;
         }
         catch (Exception ex)
@@ -230,28 +239,73 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private async Task CheckForUpdateAsync()
+    private async Task CheckForUpdateAsync(IWin32Window? owner = null)
     {
+        if (checkingUpdate)
+        {
+            if (owner != null)
+                ShowUpdateMessage(owner, T("An update check is already in progress."));
+            return;
+        }
         checkingUpdate = true;
-        nextUpdate = DateTimeOffset.UtcNow.AddHours(12);
         try
         {
+            if (owner != null || queuedUpdate == null)
+                nextUpdate = DateTimeOffset.UtcNow.AddHours(12);
+            var current = Version.Parse(Program.Version);
+            if (owner != null || queuedUpdate == null)
+            {
+                using var checkDeadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+                checkDeadline.CancelAfter(TimeSpan.FromSeconds(15));
+                var available = await updates.CheckAsync(current, msi, checkDeadline.Token);
+                if (closing || owner is Form { IsDisposed: true })
+                    return;
+                if (available == null)
+                {
+                    queuedUpdate = null;
+                    updateApproved = false;
+                    if (owner != null)
+                        ShowUpdateMessage(owner, T("No newer compatible release is available."));
+                    return;
+                }
+                if (!dashboard.Settings.AutoUpdate && (!updateApproved || queuedUpdate != available))
+                {
+                    if (owner == null || MessageBox.Show(owner, F("PrintBridge {0} is available. Install it when printing finishes?", available),
+                        "PrintBridge", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                        return;
+                    updateApproved = true;
+                }
+                if (queuedUpdate != available || owner != null)
+                    tray.ShowBalloonTip(4000, "PrintBridge", F("PrintBridge {0} will install when printing finishes.", available), ToolTipIcon.Info);
+                queuedUpdate = available;
+            }
+            if (!(dashboard.Settings.AutoUpdate || updateApproved))
+                return;
+            nextUpdate = DateTimeOffset.UtcNow.AddMinutes(5);
+            if (!await CanUpdateAsync())
+                return;
+
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
             deadline.CancelAfter(TimeSpan.FromMinutes(3));
-            string? package = await updates.DownloadAsync(Version.Parse(Program.Version), msi, deadline.Token);
-            if (package == null || closing || !dashboard.Settings.AutoUpdate)
-                return;
-            if (!await CanUpdateAsync())
+            string? package = await updates.DownloadAsync(current, msi, deadline.Token, queuedUpdate);
+            if (package == null)
             {
-                nextUpdate = DateTimeOffset.UtcNow.AddMinutes(5);
+                queuedUpdate = null;
+                updateApproved = false;
                 return;
             }
-            StartUpdateWorker(package);
+            if (await CanUpdateAsync())
+            {
+                using var worker = StartUpdateWorker(package);
+                await worker.WaitForExitAsync(lifetime.Token);
+            }
         }
         catch (OperationCanceledException) when (closing) { }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Automatic update did not start");
+            logger.LogWarning(ex, "Update did not start");
+            if (owner != null && !closing && owner is not Form { IsDisposed: true })
+                ShowUpdateMessage(owner, T("Could not check for updates. Try again later."), MessageBoxIcon.Warning);
         }
         finally
         {
@@ -259,7 +313,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private static void StartUpdateWorker(string package)
+    private static void ShowUpdateMessage(IWin32Window owner, string message, MessageBoxIcon icon = MessageBoxIcon.Information) =>
+        MessageBox.Show(owner, message, "PrintBridge", MessageBoxButtons.OK, icon);
+
+    private static System.Diagnostics.Process StartUpdateWorker(string package)
     {
         string worker = Path.Combine(Path.GetDirectoryName(package)!, "PrintBridge.Update.exe");
         File.Copy(Environment.ProcessPath!, worker, overwrite: true);
@@ -267,7 +324,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         start.ArgumentList.Add("--install-update");
         start.ArgumentList.Add(package);
         start.ArgumentList.Add(Environment.ProcessPath!);
-        using var process = System.Diagnostics.Process.Start(start)
+        return System.Diagnostics.Process.Start(start)
             ?? throw new InvalidOperationException("Could not start the update worker.");
     }
 

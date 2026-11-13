@@ -2,7 +2,7 @@
 
 ## 1.2.2
 
-- Added **Check for updates now** in Settings. It works independently of the automatic update setting.
+- Added **Check for updates now** in Settings. PrintBridge announces queued updates and asks for approval when automatic updates are disabled.
 
 ## 1.2.1
 

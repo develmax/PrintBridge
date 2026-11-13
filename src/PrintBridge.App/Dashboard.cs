@@ -87,6 +87,8 @@ internal sealed class Dashboard : Form
     public event Action? StatusChanged;
 
     public event Action? ExitRequested;
+    public event Func<IWin32Window, Task>? CheckUpdatesRequested;
+    public event Action? SettingsClosed;
 
     public Dashboard(SettingsService storage, StartupService startup, NetworkAdapterService adapters, PrinterDiscoveryService discovery, PrinterIdentityService identities, WindowsPrinterService windows, InstallationIntegrationService install, DiagnosticsService diagnostics, PrinterMonitorService monitor, TcpBridgeService bridge, ILogger<Dashboard> logger)
     {
@@ -465,8 +467,11 @@ internal sealed class Dashboard : Form
         return RunAsync(async () =>
         {
             IReadOnlyList<WifiAdapter> list = await Task.Run((Func<IReadOnlyList<WifiAdapter>>)adapters.GetAdapters, stop.Token);
-            using PreferencesForm dialog = new PreferencesForm(Settings, startup.Enabled, list, diagnostics.Clean);
-            if (dialog.ShowDialog(this) == DialogResult.OK)
+            using PreferencesForm dialog = new(Settings, startup.Enabled, list, diagnostics.Clean,
+                owner => CheckUpdatesRequested?.Invoke(owner) ?? Task.CompletedTask);
+            var result = dialog.ShowDialog(this);
+            SettingsClosed?.Invoke();
+            if (result == DialogResult.OK)
             {
                 AppSettings before = Settings;
                 Save(dialog.Value);

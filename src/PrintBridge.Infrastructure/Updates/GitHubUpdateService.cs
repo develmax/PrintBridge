@@ -45,10 +45,10 @@ public sealed class GitHubUpdateService
         return asset is null ? null : (Version.Parse(release.Tag.AsSpan(1)), asset);
     }
 
-    public async Task<string?> DownloadAsync(Version current, bool msi, CancellationToken token)
+    public async Task<string?> DownloadAsync(Version current, bool msi, CancellationToken token, Version? expected = null)
     {
         var update = await FindAsync(current, msi, token).ConfigureAwait(false);
-        if (update is null)
+        if (update is null || (expected is not null && update.Value.Version != expected))
             return null;
         var asset = update.Value.Asset;
 

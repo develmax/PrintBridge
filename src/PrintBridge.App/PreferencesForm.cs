@@ -65,7 +65,8 @@ internal sealed class PreferencesForm : Form
 
     public bool StartupEnabled => startup.Checked;
 
-    public PreferencesForm(AppSettings settings, bool runAtStartup, IReadOnlyList<WifiAdapter> adapters, Action clean)
+    public PreferencesForm(AppSettings settings, bool runAtStartup, IReadOnlyList<WifiAdapter> adapters, Action clean,
+        Func<IWin32Window, Task> checkUpdates)
     {
         PreferencesForm preferencesForm = this;
         initial = settings;
@@ -99,21 +100,7 @@ internal sealed class PreferencesForm : Form
             checkUpdate.Enabled = false;
             try
             {
-                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                bool msi = File.Exists(Path.Combine(AppContext.BaseDirectory, "msi-installation.txt"));
-                var version = await new GitHubUpdateService().CheckAsync(Version.Parse(Program.Version), msi, deadline.Token);
-                if (IsDisposed || Disposing)
-                    return;
-                if (version is null)
-                    MessageBox.Show(this, T("No newer compatible release is available."), Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
-                else if (MessageBox.Show(this, F("PrintBridge {0} is available. Open the release page?", version), Text,
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AboutForm.RepositoryUrl + $"/releases/tag/v{version}") { UseShellExecute = true });
-            }
-            catch (Exception)
-            {
-                if (!IsDisposed && !Disposing)
-                    MessageBox.Show(this, T("Could not check for updates. Try again later."), Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                await checkUpdates(this);
             }
             finally
             {

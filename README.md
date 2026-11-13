@@ -27,7 +27,7 @@ Closing the window sends PrintBridge to the tray. You can enable automatic start
 
 Releases include a direct EXE download, a ZIP containing the same EXE, and an MSI for Windows Installer deployments. Use the same installer type for upgrades. To switch between EXE and MSI, restore the original port, uninstall PrintBridge, and then install the other package. Restore the original port before uninstalling the MSI.
 
-PrintBridge checks shortly after launch and every 12 hours while running, and installs newer stable GitHub releases in the background. It verifies the package against GitHub's SHA-256 digest, defers installation while printing or configuration is in progress, and returns to the tray after setup. Automatic updates are enabled by default. To turn them off, clear **Automatically check for and install updates** in **Settings**. Use **Check for updates now** to look for a compatible release on demand and open its download page.
+PrintBridge checks shortly after launch and every 12 hours while running, and installs newer stable GitHub releases in the background. It verifies the package against GitHub's SHA-256 digest, defers installation while printing or configuration is in progress, and returns to the tray after setup. Automatic updates are enabled by default. To turn them off, clear **Automatically check for and install updates** in **Settings**. **Check for updates now** checks on demand and queues a compatible release for installation, asking for approval if automatic updates are off. PrintBridge shows a tray notification when it queues an update.
 
 ## Troubleshooting
 
