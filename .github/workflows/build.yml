@@ -45,19 +45,36 @@ jobs:
           $process = Start-Process $setup -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /CURRENTUSER /NORESTART /DIR=`"$destination`"" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Inno Setup exited with $($process.ExitCode)" }
           "PRINTBRIDGE_ISCC=$(Join-Path $destination 'ISCC.exe')" >> $env:GITHUB_ENV
-      - name: Build installer
+      - name: Build release packages
         env:
           PRINTBRIDGE_RUNTIME: ${{ matrix.runtime }}
         shell: pwsh
         run: |
-          ./scripts/build-installer.ps1 -Runtime $env:PRINTBRIDGE_RUNTIME
-          $directory = if ($env:PRINTBRIDGE_RUNTIME -eq 'win-arm64') { 'artifacts/installer/arm64' } else { 'artifacts/installer' }
-          New-Item -ItemType Directory -Force artifacts/dist | Out-Null
-          Copy-Item (Join-Path $directory 'PrintBridge-Setup.exe') "artifacts/dist/PrintBridge-Setup-$env:PRINTBRIDGE_RUNTIME.exe"
+          $tool = Join-Path $env:RUNNER_TEMP 'PrintBridge-WiX'
+          dotnet tool install wix --version 6.0.2 --tool-path $tool
+          if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }
+          ./scripts/build-release-packages.ps1 -Runtime $env:PRINTBRIDGE_RUNTIME -Wix (Join-Path $tool 'wix.exe')
+      - name: Verify x64 MSI installation
+        if: matrix.runtime == 'win-x64'
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem artifacts/dist/win-x64 -Filter *.msi).FullName
+          $log = Join-Path $env:RUNNER_TEMP 'printbridge-msi.log'
+          $target = Join-Path $env:LOCALAPPDATA 'Programs/PrintBridge/PrintBridge.exe'
+          $install = Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart /L*v `"$log`"" -Wait -PassThru
+          if ($install.ExitCode -ne 0 -or -not (Test-Path $target)) {
+              if (Test-Path $log) { Get-Content $log -Tail 80 }
+              throw "MSI installation failed with exit code $($install.ExitCode)"
+          }
+          $remove = Start-Process msiexec.exe -ArgumentList "/x `"$msi`" /qn /norestart /L*v `"$log`"" -Wait -PassThru
+          if ($remove.ExitCode -ne 0 -or (Test-Path $target)) {
+              if (Test-Path $log) { Get-Content $log -Tail 80 }
+              throw "MSI removal failed with exit code $($remove.ExitCode)"
+          }
       - uses: actions/upload-artifact@v7
         with:
           name: PrintBridge-${{ matrix.runtime }}
-          path: artifacts/dist/*.exe
+          path: artifacts/dist/${{ matrix.runtime }}/*
           if-no-files-found: error
           compression-level: 0
 
@@ -83,9 +100,11 @@ jobs:
         run: |
           $version = ([xml](Get-Content -Raw Directory.Build.props)).Project.PropertyGroup.Version
           if ($env:GITHUB_REF_NAME -ne "v$version") { throw "Tag must match v$version" }
-          $installers = @(Get-ChildItem dist -Filter *.exe)
-          if ($installers.Count -ne 2) { throw 'Expected both Windows installers' }
-          $installers | Sort-Object Name | ForEach-Object {
+          $expected = foreach ($runtime in 'win-x64', 'win-arm64') {
+              foreach ($extension in 'exe', 'msi', 'zip') { "PrintBridge-Setup-$version-$runtime.$extension" }
+          }
+          $packages = foreach ($name in $expected) { Get-Item -LiteralPath "dist/$name" -ErrorAction Stop }
+          $packages | Sort-Object Name | ForEach-Object {
               "$( (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant() )  $($_.Name)"
           } | Set-Content -Encoding ascii dist/SHA256SUMS.txt
           $lines = Get-Content CHANGELOG.md

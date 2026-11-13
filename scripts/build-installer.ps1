@@ -20,6 +20,6 @@ if (-not $Iscc) { throw 'ISCC.exe is missing. Install Inno Setup or pass -Iscc.'
 $version = ([xml](Get-Content -Raw (Join-Path $root 'Directory.Build.props'))).Project.PropertyGroup.Version
 $arch = if ($Runtime -eq 'win-arm64') { 'arm64' } else { 'x64compatible' }
 $output = if ($Runtime -eq 'win-arm64') { 'artifacts/installer/arm64' } else { 'artifacts/installer' }
-& $Iscc "/O$(Join-Path $root $output)" "/DBuildVersion=$version" "/DArch=$arch" "/DPublishDir=$root\artifacts\publish\$Runtime" (Join-Path $root 'installer/PrintBridge.iss')
+& $Iscc "/O$(Join-Path $root $output)" "/DBuildVersion=$version" "/DArch=$arch" "/DRuntimeName=$Runtime" "/DPublishDir=$root\artifacts\publish\$Runtime" (Join-Path $root 'installer/PrintBridge.iss')
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
-Get-Item (Join-Path (Join-Path $root $output) 'PrintBridge-Setup.exe')
+Get-Item (Join-Path (Join-Path $root $output) "PrintBridge-Setup-$version-$Runtime.exe")

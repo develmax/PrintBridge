@@ -1,0 +1,66 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="PrintBridge" Manufacturer="develmax" Version="$(var.BuildVersion)"
+           UpgradeCode="$(var.UpgradeCode)" Scope="perUser" Language="1033">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of PrintBridge is already installed."
+                  Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/develmax/PrintBridge" />
+    <Property Id="PB_AUTOUPDATE" Secure="yes" />
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+    <Property Id="WINDOWS_BUILD">
+      <RegistrySearch Id="WindowsBuildNumber" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                      Name="CurrentBuildNumber" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="OTHER_MSI">
+      <RegistrySearch Id="MsiArchitecture" Root="HKCU" Key="Software\PrintBridge"
+                      Name="MsiArchitecture" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="INNO_INSTALLED">
+      <RegistrySearch Id="InnoInstallPath" Root="HKCU"
+                      Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\{0312689D-FCDD-4576-A25A-FADBE4E5D159}_is1"
+                      Name="InstallLocation" Type="raw" Bitness="always64" />
+    </Property>
+    <Launch Condition="Installed OR NOT INNO_INSTALLED"
+            Message="PrintBridge was installed with EXE Setup. Use the EXE package to update it. To switch package types, restore the original printer port and uninstall PrintBridge first." />
+    <Launch Condition="Installed OR NOT OTHER_MSI OR OTHER_MSI = &quot;$(var.Arch)&quot;"
+            Message="PrintBridge is already installed for a different architecture. Restore the original printer port and uninstall PrintBridge first." />
+    <Launch Condition="Installed OR (VersionNT64 AND WINDOWS_BUILD &gt;= 19045)"
+            Message="PrintBridge requires Windows 10 22H2 or later." />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="PrintBridge">
+          <Component Id="Application" Guid="$(var.AppComponent)">
+            <File Id="ApplicationExe" Source="$(var.PublishDir)\PrintBridge.exe" />
+            <File Source="msi-installation.txt" />
+            <File Source="..\LICENSE" />
+            <File Source="..\THIRD-PARTY-NOTICES.md" />
+            <RegistryValue Root="HKCU" Key="Software\PrintBridge" Name="MsiArchitecture" Type="string" Value="$(var.Arch)" KeyPath="yes" />
+          </Component>
+          <Directory Id="ThirdPartyFolder" Name="ThirdParty" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="MenuShortcut" Guid="$(var.ShortcutComponent)">
+        <Shortcut Id="PrintBridgeShortcut" Name="PrintBridge" Target="[#ApplicationExe]" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\PrintBridge" Name="MsiShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <Feature Id="PrintBridge" Title="PrintBridge">
+      <ComponentRef Id="Application" />
+      <ComponentRef Id="MenuShortcut" />
+      <Files Directory="ThirdPartyFolder" Include="$(var.PublishDir)\ThirdParty\**" />
+    </Feature>
+    <CustomAction Id="StopForUpgrade" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]PrintBridge.exe&quot; --msi-stop --quiet"
+                  Return="check" />
+    <CustomAction Id="StopForAutomaticUpgrade" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]PrintBridge.exe&quot; --msi-stop --automatic --quiet"
+                  Return="check" />
+    <CustomAction Id="StopForUninstall" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]PrintBridge.exe&quot; --msi-stop --remove --quiet"
+                  Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="StopForUpgrade" Before="StopForAutomaticUpgrade" Condition="WIX_UPGRADE_DETECTED AND NOT PB_AUTOUPDATE" />
+      <Custom Action="StopForAutomaticUpgrade" Before="StopForUninstall" Condition="WIX_UPGRADE_DETECTED AND PB_AUTOUPDATE = 1" />
+      <Custom Action="StopForUninstall" Before="InstallValidate" Condition="REMOVE = &quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

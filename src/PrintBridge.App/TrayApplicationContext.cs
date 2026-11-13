@@ -31,6 +31,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly EventWaitHandle stopEvent = new EventWaitHandle(initialState: false, EventResetMode.AutoReset, Program.SessionName + ".Stop");
 
     private readonly EventWaitHandle showEvent = new EventWaitHandle(initialState: false, EventResetMode.AutoReset, Program.SessionName + ".Show");
+    private readonly EventWaitHandle updateStopEvent = new(false, EventResetMode.AutoReset, Program.SessionName + ".StopForUpdate");
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly WindowsPrinterService windows;
+    private readonly GitHubUpdateService updates = new();
+    private readonly bool msi = File.Exists(Path.Combine(AppContext.BaseDirectory, "msi-installation.txt"));
+    private DateTimeOffset nextUpdate = DateTimeOffset.UtcNow.AddMinutes(1);
+    private bool checkingUpdate;
+    private bool preparingUpdate;
 
     private readonly ILogger logger;
 
@@ -46,9 +54,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private DateTimeOffset nextCheck;
 
-    public TrayApplicationContext(IServiceProvider services, bool trayLaunch)
+    public TrayApplicationContext(IServiceProvider services, bool trayLaunch, bool afterUpdate)
     {
         logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge");
+        windows = services.GetRequiredService<WindowsPrinterService>();
         dashboard = ActivatorUtilities.CreateInstance<Dashboard>(services, Array.Empty<object>());
         ContextMenuStrip menu = new ContextMenuStrip
         {
@@ -133,7 +142,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         timer.Start();
         logger.LogInformation("PrintBridge {Version} started", Program.Version);
         Render();
-        if (!trayLaunch || !dashboard.Settings.StartHidden || dashboard.Settings.Profile == null)
+        if (!afterUpdate && (!trayLaunch || !dashboard.Settings.StartHidden || dashboard.Settings.Profile == null))
         {
             Open();
         }
@@ -174,6 +183,22 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             Open();
         }
+        if (updateStopEvent.WaitOne(0))
+        {
+            if (preparingUpdate)
+                return;
+            preparingUpdate = true;
+            if (await CanUpdateAsync() && !closing)
+            {
+                await ShutdownAsync();
+                return;
+            }
+            preparingUpdate = false;
+        }
+        if (preparingUpdate)
+            return;
+        if (dashboard.Settings.AutoUpdate && !checkingUpdate && DateTimeOffset.UtcNow >= nextUpdate)
+            _ = CheckForUpdateAsync();
         dashboard.Render();
         if (!dashboard.Busy && dashboard.Pending == null && dashboard.Settings.Profile != null && !dashboard.Monitor.Paused)
         {
@@ -184,6 +209,66 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 await dashboard.CheckAsync(networkEvent, background: true);
             }
         }
+    }
+
+    private async Task<bool> CanUpdateAsync()
+    {
+        if (closing || !dashboard.Settings.AutoUpdate || dashboard.Busy || dashboard.Pending != null || dashboard.Bridge.Active != 0)
+            return false;
+
+        var profile = dashboard.Settings.Profile;
+        try
+        {
+            return (profile == null || !await Task.Run(() => windows.HasJobs(profile.Print.Queue))) &&
+                !closing && dashboard.Settings.AutoUpdate && !dashboard.Busy && dashboard.Pending == null &&
+                dashboard.Settings.Profile == profile && dashboard.Bridge.Active == 0;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not check the print queue for an update");
+            return false;
+        }
+    }
+
+    private async Task CheckForUpdateAsync()
+    {
+        checkingUpdate = true;
+        nextUpdate = DateTimeOffset.UtcNow.AddHours(12);
+        try
+        {
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+            deadline.CancelAfter(TimeSpan.FromMinutes(3));
+            string? package = await updates.DownloadAsync(Version.Parse(Program.Version), msi, deadline.Token);
+            if (package == null || closing || !dashboard.Settings.AutoUpdate)
+                return;
+            if (!await CanUpdateAsync())
+            {
+                nextUpdate = DateTimeOffset.UtcNow.AddMinutes(5);
+                return;
+            }
+            StartUpdateWorker(package);
+        }
+        catch (OperationCanceledException) when (closing) { }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Automatic update did not start");
+        }
+        finally
+        {
+            checkingUpdate = false;
+        }
+    }
+
+    private static void StartUpdateWorker(string package)
+    {
+        string worker = Path.Combine(Path.GetDirectoryName(package)!, "PrintBridge.Update.exe");
+        File.Copy(Environment.ProcessPath!, worker, overwrite: true);
+        var start = new System.Diagnostics.ProcessStartInfo(worker) { UseShellExecute = false };
+        start.ArgumentList.Add("--install-update");
+        start.ArgumentList.Add(package);
+        start.ArgumentList.Add(Environment.ProcessPath!);
+        using var process = System.Diagnostics.Process.Start(start)
+            ?? throw new InvalidOperationException("Could not start the update worker.");
     }
 
     private void NetworkAddressChanged(object? sender, EventArgs args)
@@ -252,6 +337,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (!closing)
         {
             closing = true;
+            lifetime.Cancel();
             timer.Stop();
             tray.Visible = false;
             await dashboard.ShutdownAsync();
@@ -271,6 +357,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             icon?.Dispose();
             stopEvent.Dispose();
             showEvent.Dispose();
+            updateStopEvent.Dispose();
+            lifetime.Dispose();
             dashboard.Dispose();
         }
         base.Dispose(disposing);

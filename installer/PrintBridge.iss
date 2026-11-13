@@ -1,11 +1,14 @@
 #ifndef BuildVersion
-  #define BuildVersion "1.1.0"
+  #define BuildVersion "1.2.0"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\win-x64"
 #endif
 #ifndef Arch
   #define Arch "x64compatible"
+#endif
+#ifndef RuntimeName
+  #define RuntimeName "win-x64"
 #endif
 [Setup]
 AppId={{0312689D-FCDD-4576-A25A-FADBE4E5D159}
@@ -25,7 +28,7 @@ ArchitecturesAllowed={#Arch}
 ArchitecturesInstallIn64BitMode={#Arch}
 MinVersion=10.0.19045
 OutputDir=..\artifacts\installer
-OutputBaseFilename=PrintBridge-Setup
+OutputBaseFilename=PrintBridge-Setup-{#BuildVersion}-{#RuntimeName}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -47,6 +50,8 @@ russian.CloseFailure=PrintBridge занят. Дождитесь завершен
 english.CloseFailure=PrintBridge is busy. Wait for the current operation and retry setup.
 russian.CleanupFailure=Удаление PrintBridge остановлено. Проверьте состояние очереди в PrintBridge и повторите попытку.
 english.CleanupFailure=PrintBridge uninstall stopped. Check the queue in PrintBridge and retry.
+english.MsiInstalled=PrintBridge was installed with MSI. Use the MSI package to update it.
+russian.MsiInstalled=PrintBridge установлен из MSI. Используйте MSI-пакет для обновления.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Flags: unchecked
@@ -85,16 +90,34 @@ end;
 var
   WasRunning: Boolean;
 
+function IsAutomaticUpdate: Boolean;
+var
+  I: Integer;
+begin
+  Result := True;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/PBUPDATE') = 0 then Exit;
+  Result := False;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Code: Integer;
-  AppPath: String;
+  AppPath, StopArguments: String;
 begin
   Result := '';
   AppPath := ExpandConstant('{app}\PrintBridge.exe');
+  if FileExists(ExpandConstant('{app}\msi-installation.txt')) then
+  begin
+    Result := CustomMessage('MsiInstalled');
+    Exit;
+  end;
+  StopArguments := '--stop --quiet';
+  if IsAutomaticUpdate then
+    StopArguments := '--stop-for-update --quiet';
   if FileExists(AppPath) then
   begin
-    if not Exec(AppPath, '--stop --quiet', '', SW_HIDE, ewWaitUntilTerminated, Code) then
+    if not Exec(AppPath, StopArguments, '', SW_HIDE, ewWaitUntilTerminated, Code) then
       Result := CustomMessage('CloseFailure')
     else if (Code <> 0) and (Code <> 3) then
       Result := CustomMessage('CloseFailure')
@@ -103,11 +126,11 @@ begin
   end;
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
+procedure DeinitializeSetup;
 var
   Code: Integer;
 begin
-  if (CurStep = ssDone) and WasRunning then
+  if WasRunning and not IsAutomaticUpdate then
     ExecAsOriginalUser(ExpandConstant('{app}\PrintBridge.exe'), '--tray', '', SW_SHOWNORMAL, ewNoWait, Code);
 end;
 

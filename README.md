@@ -19,7 +19,11 @@ PrintBridge is a Windows utility that routes RAW printing to a network printer o
 3. Choose **Create a separate queue** to keep the original queue available or **Switch the selected queue** to keep using its existing name. Approve the Windows request to change the queue or create its port.
 4. Print a test page and check the physical output. For normal printing, select the Windows queue you connected in the wizard.
 
-Closing the window sends PrintBridge to the tray. You can enable automatic startup under **Settings**. To remove the integration, choose **Restore original port**. Windows uninstallation also offers to clean up the queue integration before removing the app. A per-user upgrade preserves the profile and any language saved in Settings.
+Closing the window sends PrintBridge to the tray. You can enable automatic startup under **Settings**. To remove the integration, choose **Restore original port**. The EXE uninstaller also offers to clean up the queue integration before removing the app. A per-user upgrade preserves the profile and any language saved in Settings.
+
+Releases include a direct EXE download, a ZIP containing the same EXE, and an MSI for Windows Installer deployments. Use the same installer type for upgrades. To switch between EXE and MSI, restore the original port, uninstall PrintBridge, and then install the other package. Restore the original port before uninstalling the MSI.
+
+Enable **Settings → Automatically check for and install updates** to install newer stable GitHub releases in the background. PrintBridge checks shortly after launch and every 12 hours while running. It verifies the package against GitHub's SHA-256 digest, defers installation while printing or configuration is in progress, and returns to the tray after setup. The setting is off until enabled.
 
 ## Troubleshooting
 
@@ -42,7 +46,9 @@ Install the .NET 10 SDK and Inno Setup 6.7 or later on Windows. Run these comman
 ./scripts/build-installer.ps1 -Runtime win-arm64
 ```
 
-See the [contribution guide](CONTRIBUTING.md), [acceptance checklist](docs/acceptance.md), and [changelog](CHANGELOG.md). The installer and application binaries are unsigned.
+To build all release formats, install the WiX 6.0.2 .NET tool and run `./scripts/build-release-packages.ps1` once per architecture.
+
+See the [contribution guide](CONTRIBUTING.md), [roadmap](ROADMAP.md), [acceptance checklist](docs/acceptance.md), and [changelog](CHANGELOG.md). The installer and application binaries are unsigned.
 
 ## Author and license
 

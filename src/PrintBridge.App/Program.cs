@@ -36,11 +36,40 @@ internal static class Program
         var install = provider.GetRequiredService<InstallationIntegrationService>();
         try
         {
-            if (args.FirstOrDefault() == "--stop")
+            if (args.FirstOrDefault() == "--install-update" && args.Length == 3)
+            {
+                bool msi = Path.GetExtension(args[1]) == ".msi";
+                try
+                {
+                    UpdateInstaller.InstallAsync(args[1], msi,
+                        provider.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge")).GetAwaiter().GetResult();
+                }
+                finally
+                {
+                    if (Mutex.TryOpenExisting(SessionName, out var runningInstance))
+                        runningInstance.Dispose();
+                    else if (File.Exists(args[2]))
+                        Process.Start(new ProcessStartInfo(args[2], "--after-update") { UseShellExecute = false });
+                }
+                return 0;
+            }
+            if (args.FirstOrDefault() == "--msi-stop")
+            {
+                bool uninstall = args.Contains("--remove");
+                if (uninstall && (provider.GetRequiredService<SettingsService>().Pending() != null ||
+                    provider.GetRequiredService<SettingsService>().Load().Profile != null))
+                    return 1;
+                if (!install.StopInstance(args.Contains("--automatic")))
+                    return 1;
+                if (uninstall)
+                    provider.GetRequiredService<StartupService>().Enabled = false;
+                return 0;
+            }
+            if (args.FirstOrDefault() is "--stop" or "--stop-for-update")
             {
                 bool running = Mutex.TryOpenExisting(SessionName, out var instance);
                 instance?.Dispose();
-                return install.StopInstance() ? (running ? 3 : 0) : 1;
+                return install.StopInstance(forUpdate: args[0] == "--stop-for-update") ? (running ? 3 : 0) : 1;
             }
 
             Select(args.FirstOrDefault() == "--spooler" && args.Length == 4
@@ -60,7 +89,8 @@ internal static class Program
                     InstallationIntegrationService.Signal(".Show");
                     return 0;
                 }
-                using var context = new TrayApplicationContext(provider, args.Contains("--tray"));
+                bool afterUpdate = args.Contains("--after-update");
+                using var context = new TrayApplicationContext(provider, args.Contains("--tray") || afterUpdate, afterUpdate);
                 Application.Run(context);
             }
             if (RestartRequested)
@@ -71,7 +101,7 @@ internal static class Program
         {
             if (args.FirstOrDefault() != "--spooler")
                 provider.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge").LogError(ex, "Application error");
-            if (!args.Contains("--quiet"))
+            if (!args.Contains("--quiet") && args.FirstOrDefault() != "--install-update")
                 MessageBox.Show(ex.Message, "PrintBridge", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }

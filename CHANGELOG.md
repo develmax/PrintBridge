@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+- Added optional automatic updates from stable GitHub releases. PrintBridge verifies the installer digest, waits for an idle queue and bridge, and restarts after the update.
+- Added versioned EXE, MSI, and ZIP downloads for x64 and ARM64. Each ZIP contains the matching EXE installer.
+
 ## 1.1.0
 
 - Added English and Russian app languages, with English selected by default and a language selector in Settings.

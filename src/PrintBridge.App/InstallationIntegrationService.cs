@@ -86,7 +86,7 @@ public sealed class InstallationIntegrationService(SettingsService settings, Sta
         }
     }
 
-    internal bool StopInstance()
+    internal bool StopInstance(bool forUpdate = false)
     {
         if (!Mutex.TryOpenExisting(Program.SessionName, out Mutex? mutex))
         {
@@ -94,10 +94,10 @@ public sealed class InstallationIntegrationService(SettingsService settings, Sta
         }
         using (mutex)
         {
-            Signal(".Stop");
+            Signal(forUpdate ? ".StopForUpdate" : ".Stop");
             try
             {
-                if (!mutex.WaitOne(TimeSpan.FromSeconds(45L)))
+                if (!mutex.WaitOne(TimeSpan.FromSeconds(45)))
                 {
                     return false;
                 }

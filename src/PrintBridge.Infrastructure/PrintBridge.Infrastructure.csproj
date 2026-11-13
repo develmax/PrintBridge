@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="PrintBridge.IntegrationTests" />
+  </ItemGroup>
   <PropertyGroup><TargetFramework>net10.0-windows</TargetFramework></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PrintBridge.Core/PrintBridge.Core.csproj" />

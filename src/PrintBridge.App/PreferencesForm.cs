@@ -27,6 +27,7 @@ internal sealed class PreferencesForm : Form
     private readonly CheckBox search;
 
     private readonly CheckBox verbose;
+    private readonly CheckBox autoUpdate;
 
     private readonly ComboBox language = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
 
@@ -52,6 +53,7 @@ internal sealed class PreferencesForm : Form
         Notify = notify.Checked,
         AutoDiscover = search.Checked,
         Verbose = verbose.Checked,
+        AutoUpdate = autoUpdate.Checked,
         Language = language.SelectedIndex == 1 ? Russian : English,
         Adapter = ((AdapterChoice)wifi.SelectedItem!).Id,
         IntervalSeconds = (int)interval.Value,
@@ -90,6 +92,7 @@ internal sealed class PreferencesForm : Form
         notify = Check(T("Show tray notifications"), settings.Notify);
         search = Check(T("Find new IP addresses automatically"), settings.AutoDiscover);
         verbose = Check(T("Verbose logging"), settings.Verbose);
+        autoUpdate = Check(T("Automatically check for and install updates"), settings.AutoUpdate);
         interval = Number(T("Check interval (seconds)"), settings.IntervalSeconds, 15, 3600);
         local = Number(T("Local port"), settings.LocalPort, 1024, 65535);
         local.Enabled = settings.Profile == null;
