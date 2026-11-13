@@ -42,7 +42,8 @@ internal sealed class Dashboard : Form
     private readonly ToolTip portTip = new ToolTip();
 
     private readonly Label[] values = new Label[3];
-    private readonly PictureBox statusIndicator = new() { Size = new Size(16, 16), Margin = new Padding(3, 12, 5, 0) };
+    private readonly PictureBox headerIcon = new() { Size = new Size(32, 32), Margin = new Padding(3, 0, 9, 0) };
+    private readonly Icon appIcon;
     private Color indicatorColor;
 
     private readonly TextBox bridgeDetails = ScrollableDetails(T("TCP bridge details"));
@@ -125,7 +126,9 @@ internal sealed class Dashboard : Form
         }
         diagnostics.Verbose = Settings.Verbose;
         Text = "PrintBridge " + Program.Version;
-        Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? SystemIcons.Application;
+        using (var resource = typeof(Dashboard).Assembly.GetManifestResourceStream("PrintBridge.AppIcon")!)
+            appIcon = new Icon(resource, 64, 64);
+        Icon = appIcon;
         AutoScaleMode = AutoScaleMode.Dpi;
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(760, 620);
@@ -140,21 +143,31 @@ internal sealed class Dashboard : Form
         };
         Controls.Add(body);
         Controls.Add(progress);
-        var header = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
-        statusIndicator.Paint += (_, e) =>
+        var header = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        headerIcon.Anchor = AnchorStyles.Left;
+        headerIcon.Paint += (_, e) =>
         {
+            var bounds = headerIcon.ClientRectangle;
+            e.Graphics.DrawIcon(appIcon, bounds);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            int inset = LogicalToDeviceUnits(3);
+            int diameter = LogicalToDeviceUnits(11);
+            var badge = new Rectangle(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter);
+            using var outline = new SolidBrush(BackColor);
+            e.Graphics.FillEllipse(outline, badge);
+            badge.Inflate(-LogicalToDeviceUnits(1), -LogicalToDeviceUnits(1));
             using var brush = new SolidBrush(StatusColor);
-            e.Graphics.FillEllipse(brush, inset, inset, statusIndicator.Width - 2 * inset, statusIndicator.Height - 2 * inset);
+            e.Graphics.FillEllipse(brush, badge);
         };
-        header.Controls.Add(statusIndicator);
+        header.Controls.Add(headerIcon, 0, 0);
         header.Controls.Add(new Label
         {
             Text = "PrintBridge",
             Font = new Font(Font.FontFamily, 22f, FontStyle.Bold),
-            AutoSize = true
-        });
+            AutoSize = true,
+            Anchor = AnchorStyles.Left
+        }, 1, 0);
         body.Controls.Add(header);
         headline.Font = new Font(Font.FontFamily, 11f, FontStyle.Bold);
         headline.Margin = new Padding(3, 12, 3, 8);
@@ -316,7 +329,7 @@ internal sealed class Dashboard : Form
         if (indicatorColor != StatusColor)
         {
             indicatorColor = StatusColor;
-            statusIndicator.Invalidate();
+            headerIcon.Invalidate();
         }
         string? currentPort = state.Queue?.Port;
         bool usesBridge = plan is not null && SpoolerState.Same(currentPort, plan.PortName);
@@ -674,6 +687,8 @@ internal sealed class Dashboard : Form
                 item.Image?.Dispose();
             moreActions.Dispose();
             commandIconFont.Dispose();
+            Icon = null;
+            appIcon.Dispose();
             foreach (Button button in actions.Controls)
                 button.Image?.Dispose();
         }

@@ -1,4 +1,4 @@
-# PrintBridge
+# <img src="docs/printbridge.png" alt="" width="30" height="30"> PrintBridge
 
 [![Build and tests](https://github.com/develmax/PrintBridge/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/develmax/PrintBridge/actions/workflows/build.yml)
 [![CodeQL](https://github.com/develmax/PrintBridge/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/develmax/PrintBridge/actions/workflows/codeql.yml)
@@ -55,7 +55,7 @@ Install the .NET 10 SDK and Inno Setup 6.7 or later on Windows. Run these comman
 
 To build all release formats, install the WiX 6.0.2 .NET tool and run `./scripts/build-release-packages.ps1` once per architecture.
 
-See the [contribution guide](CONTRIBUTING.md), [roadmap](ROADMAP.md), [acceptance checklist](docs/acceptance.md), and [changelog](CHANGELOG.md). The installer and application binaries are unsigned.
+See the [contribution guide](CONTRIBUTING.md), [roadmap](ROADMAP.md), [acceptance checklist](docs/acceptance.md), and [changelog](CHANGELOG.md). See [release signature verification](docs/release-signing.md) for signed packages and maintainer instructions.
 
 ## Author and license
 

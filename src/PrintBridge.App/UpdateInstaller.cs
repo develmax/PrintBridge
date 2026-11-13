@@ -7,6 +7,8 @@ internal static class UpdateInstaller
 {
     public static async Task InstallAsync(string package, bool msi, ILogger logger)
     {
+        await using var verified = await GitHubUpdateService.OpenVerifiedPackageAsync(
+            package, Version.Parse(Program.Version), msi, CancellationToken.None).ConfigureAwait(false);
         string log = Path.Combine(Path.GetDirectoryName(package)!, "installation.log");
         var start = new ProcessStartInfo
         {

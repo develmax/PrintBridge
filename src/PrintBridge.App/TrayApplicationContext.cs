@@ -364,11 +364,17 @@ internal sealed class TrayApplicationContext : ApplicationContext
         Color color = dashboard.StatusColor;
         if (color != lastColor)
         {
-            using Bitmap bitmap = (dashboard.Icon ?? SystemIcons.Application).ToBitmap();
+            using var trayIcon = new Icon(dashboard.Icon ?? SystemIcons.Application, SystemInformation.SmallIconSize);
+            using var bitmap = new Bitmap(trayIcon.Width, trayIcon.Height);
             using (Graphics graphics = Graphics.FromImage(bitmap))
             {
+                graphics.DrawIcon(trayIcon, new Rectangle(Point.Empty, bitmap.Size));
+                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                int diameter = Math.Max(6, bitmap.Width / 3);
+                using SolidBrush outline = new SolidBrush(SystemColors.Control);
+                graphics.FillEllipse(outline, bitmap.Width - diameter, bitmap.Height - diameter, diameter, diameter);
                 using SolidBrush fill = new SolidBrush(color);
-                graphics.FillEllipse(fill, bitmap.Width - 14, bitmap.Height - 14, 13, 13);
+                graphics.FillEllipse(fill, bitmap.Width - diameter + 1, bitmap.Height - diameter + 1, diameter - 2, diameter - 2);
             }
             nint handle = bitmap.GetHicon();
             using Icon native = Icon.FromHandle(handle);

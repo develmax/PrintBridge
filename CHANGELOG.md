@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.6
+
+- Added the PrintBridge icon to the window header and overlaid the connection indicator on it.
+- Signed Windows packages with the PrintBridge publisher key and made the updater require a signed release manifest.
+
 ## 1.2.5
 
 - Smoothed toolbar and menu icons and added a connection indicator beside the PrintBridge title.

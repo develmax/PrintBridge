@@ -1,6 +1,7 @@
 param(
     [ValidateSet('win-x64','win-arm64')][string]$Runtime = 'win-x64',
-    [string]$Wix = $env:PRINTBRIDGE_WIX
+    [string]$Wix = $env:PRINTBRIDGE_WIX,
+    [switch]$Sign
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -8,7 +9,7 @@ if (-not $Wix) {
     $localTool = Join-Path $root 'artifacts/tools/wix/wix.exe'
     $Wix = if (Test-Path $localTool) { $localTool } else { (Get-Command wix -ErrorAction Stop).Source }
 }
-$exe = & (Join-Path $PSScriptRoot 'build-installer.ps1') -Runtime $Runtime |
+$exe = & (Join-Path $PSScriptRoot 'build-installer.ps1') -Runtime $Runtime -Sign:$Sign |
     Where-Object { $_ -is [System.IO.FileInfo] } | Select-Object -Last 1
 if (-not $exe) { throw 'The EXE installer is missing' }
 $version = ([xml](Get-Content -Raw (Join-Path $root 'Directory.Build.props'))).Project.PropertyGroup.Version
@@ -32,4 +33,5 @@ try {
     & $Wix build -arch $arch -define "Arch=$arch" -define "BuildVersion=$version" -define "PublishDir=$publish" -define "UpgradeCode=$upgrade" -define "AppComponent=$app" -define "ShortcutComponent=$shortcut" -pdbtype none -out "$base.msi" PrintBridge.wxs
     if ($LASTEXITCODE -ne 0) { throw 'MSI compilation failed' }
 } finally { Pop-Location }
+if ($Sign) { & (Join-Path $PSScriptRoot 'sign-binary.ps1') "$base.msi" }
 Get-Item "$base.exe", "$base.zip", "$base.msi"

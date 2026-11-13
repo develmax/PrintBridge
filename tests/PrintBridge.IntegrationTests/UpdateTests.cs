@@ -4,6 +4,23 @@ public sealed class UpdateTests
 {
     private static readonly Version Current = new(1, 2, 0);
 
+    [Fact]
+    public void ReleaseSignatureRejectsModifiedManifestAndAnotherSigningKey()
+    {
+        using var publisher = System.Security.Cryptography.RSA.Create(2048);
+        using var other = System.Security.Cryptography.RSA.Create(2048);
+        const string file = "PrintBridge-Setup-1.2.6-win-x64.exe";
+        string digest = new('a', 64);
+        byte[] manifest = System.Text.Encoding.ASCII.GetBytes($"{digest}  {file}\n");
+        byte[] signature = publisher.SignData(manifest, System.Security.Cryptography.HashAlgorithmName.SHA256,
+            System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        Assert.Equal(digest, ReleaseSignature.Verify(publisher, manifest, signature, file));
+        Assert.Null(ReleaseSignature.Verify(publisher, manifest, signature, file + ".zip"));
+        Assert.Null(ReleaseSignature.Verify(other, manifest, signature, file));
+        manifest[0] = (byte)'b';
+        Assert.Null(ReleaseSignature.Verify(publisher, manifest, signature, file));
+    }
+
     [Theory]
     [InlineData(60, false, 300)]
     [InlineData(60, true, 60)]
