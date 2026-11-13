@@ -174,5 +174,11 @@
   "Close": "Kapat",
   "Your printer. Always connected.": "Yazıcınız. Her zaman bağlı.",
   "No": "Hayır",
-  "Yes": "Evet"
+  "Yes": "Evet",
+  "Print queue": "Yazdırma kuyruğu",
+  "Printer connection": "Yazıcı bağlantısı",
+  "Ready to print": "Yazdırmaya hazır",
+  "Printing unavailable": "Yazdırma kullanılamıyor",
+  "Jobs in queue: {0}": "Kuyruktaki işler: {0}",
+  "Could not open the Windows print dialog.": "Windows yazdırma iletişim kutusu açılamadı."
 }

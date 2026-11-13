@@ -174,5 +174,11 @@
   "Close": "閉じる",
   "Your printer. Always connected.": "プリンターに、いつでもつながる。",
   "No": "いいえ",
-  "Yes": "はい"
+  "Yes": "はい",
+  "Print queue": "印刷キュー",
+  "Printer connection": "プリンターへの接続",
+  "Ready to print": "印刷可能",
+  "Printing unavailable": "印刷できません",
+  "Jobs in queue: {0}": "キュー内のジョブ数: {0}",
+  "Could not open the Windows print dialog.": "Windows の印刷ダイアログを開けませんでした。"
 }

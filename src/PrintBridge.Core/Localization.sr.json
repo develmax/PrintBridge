@@ -174,5 +174,11 @@
   "Close": "Затвори",
   "Your printer. Always connected.": "Ваш штампач. Увек повезан.",
   "No": "бр",
-  "Yes": "Да"
+  "Yes": "Да",
+  "Print queue": "Ред за штампање",
+  "Printer connection": "Веза са штампачем",
+  "Ready to print": "Спреман за штампање",
+  "Printing unavailable": "Штампање није доступно",
+  "Jobs in queue: {0}": "Задатака у реду: {0}",
+  "Could not open the Windows print dialog.": "Није могуће отворити прозор за штампање у систему Windows."
 }

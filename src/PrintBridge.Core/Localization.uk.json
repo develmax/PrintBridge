@@ -174,5 +174,11 @@
   "Close": "Закрити",
   "Your printer. Always connected.": "Ваш принтер. Завжди на зв’язку.",
   "No": "немає",
-  "Yes": "так"
+  "Yes": "так",
+  "Print queue": "Черга друку",
+  "Printer connection": "Зв’язок із принтером",
+  "Ready to print": "Готовий до друку",
+  "Printing unavailable": "Друк недоступний",
+  "Jobs in queue: {0}": "Завдань у черзі: {0}",
+  "Could not open the Windows print dialog.": "Не вдалося відкрити вікно друку Windows."
 }

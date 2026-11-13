@@ -7,7 +7,7 @@
 
 PrintBridge is a Windows utility that routes RAW printing to a network printer over local Wi-Fi or Ethernet. It helps when a VPN changes Windows routing or a printer receives a new IP address. It runs in the system tray and uses your installed Windows printer driver.
 
-[Download the latest release](https://github.com/develmax/PrintBridge/releases/latest) · [Report an issue](https://github.com/develmax/PrintBridge/issues)
+[Website](https://develmax.github.io/PrintBridge/) · [Download the latest release](https://github.com/develmax/PrintBridge/releases/latest) · [Wiki](https://github.com/develmax/PrintBridge/wiki) · [Report an issue](https://github.com/develmax/PrintBridge/issues)
 
 ## Compatibility
 

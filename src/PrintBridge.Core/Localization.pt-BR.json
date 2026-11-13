@@ -174,5 +174,11 @@
   "Close": "Fechar",
   "Your printer. Always connected.": "Sua impressora. Sempre conectada.",
   "No": "Não",
-  "Yes": "Sim"
+  "Yes": "Sim",
+  "Print queue": "Fila de impressão",
+  "Printer connection": "Conexão com a impressora",
+  "Ready to print": "Pronta para imprimir",
+  "Printing unavailable": "Impressão indisponível",
+  "Jobs in queue: {0}": "Trabalhos na fila: {0}",
+  "Could not open the Windows print dialog.": "Não foi possível abrir a janela de impressão do Windows."
 }

@@ -174,5 +174,11 @@
   "Close": "닫기",
   "Your printer. Always connected.": "프린터에 언제나 연결됩니다.",
   "No": "아니요",
-  "Yes": "예"
+  "Yes": "예",
+  "Print queue": "인쇄 대기열",
+  "Printer connection": "프린터 연결",
+  "Ready to print": "인쇄 준비 완료",
+  "Printing unavailable": "인쇄할 수 없음",
+  "Jobs in queue: {0}": "대기 중인 작업: {0}",
+  "Could not open the Windows print dialog.": "Windows 인쇄 대화 상자를 열 수 없습니다."
 }

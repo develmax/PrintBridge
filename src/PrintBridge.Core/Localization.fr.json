@@ -174,5 +174,11 @@
   "Close": "Fermer",
   "Your printer. Always connected.": "Votre imprimante. Toujours connectée.",
   "No": "Non",
-  "Yes": "Oui"
+  "Yes": "Oui",
+  "Print queue": "File d’impression",
+  "Printer connection": "Connexion à l’imprimante",
+  "Ready to print": "Prête à imprimer",
+  "Printing unavailable": "Impression indisponible",
+  "Jobs in queue: {0}": "Travaux en attente : {0}",
+  "Could not open the Windows print dialog.": "Impossible d’ouvrir la boîte de dialogue d’impression de Windows."
 }

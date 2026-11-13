@@ -174,5 +174,11 @@
   "Close": "关闭",
   "Your printer. Always connected.": "您的打印机，始终在线。",
   "No": "否",
-  "Yes": "是的"
+  "Yes": "是的",
+  "Print queue": "打印队列",
+  "Printer connection": "打印机连接",
+  "Ready to print": "可以打印",
+  "Printing unavailable": "无法打印",
+  "Jobs in queue: {0}": "队列中的作业数：{0}",
+  "Could not open the Windows print dialog.": "无法打开 Windows 打印对话框。"
 }

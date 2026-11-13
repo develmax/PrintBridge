@@ -174,5 +174,11 @@
   "Close": "Sluiten",
   "Your printer. Always connected.": "Uw printer. Altijd verbonden.",
   "No": "Nee",
-  "Yes": "Ja"
+  "Yes": "Ja",
+  "Print queue": "Afdrukwachtrij",
+  "Printer connection": "Verbinding met printer",
+  "Ready to print": "Gereed om af te drukken",
+  "Printing unavailable": "Afdrukken niet beschikbaar",
+  "Jobs in queue: {0}": "Taken in de wachtrij: {0}",
+  "Could not open the Windows print dialog.": "Kan het afdrukvenster van Windows niet openen."
 }

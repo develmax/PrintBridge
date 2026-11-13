@@ -3,6 +3,7 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>PrintBridge</AssemblyName>
     <RootNamespace>PrintBridge</RootNamespace>
@@ -12,7 +13,9 @@
     <DefineConstants>$(DefineConstants);SIGNED_RELEASE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Using Include="System.IO" />
     <EmbeddedResource Include="Resources/PrintBridge.ico" LogicalName="PrintBridge.AppIcon" />
+    <Resource Include="Resources/DashboardIcon.png" />
     <ProjectReference Include="../PrintBridge.Infrastructure/PrintBridge.Infrastructure.csproj" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
   </ItemGroup>

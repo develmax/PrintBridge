@@ -174,5 +174,11 @@
   "Close": "Zamknij",
   "Your printer. Always connected.": "Twoja drukarka. Zawsze podłączona.",
   "No": "Nie",
-  "Yes": "Tak"
+  "Yes": "Tak",
+  "Print queue": "Kolejka wydruku",
+  "Printer connection": "Połączenie z drukarką",
+  "Ready to print": "Gotowa do druku",
+  "Printing unavailable": "Drukowanie niedostępne",
+  "Jobs in queue: {0}": "Zadania w kolejce: {0}",
+  "Could not open the Windows print dialog.": "Nie można otworzyć okna drukowania systemu Windows."
 }
