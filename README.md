@@ -19,12 +19,14 @@ PrintBridge is a Windows utility that routes RAW printing to a network printer o
 
 ## Getting started
 
-1. Download the installer for your architecture. The installer includes the .NET runtime. Select English or Russian when setup starts. You can change the app language later under **Settings → Language**.
+1. Download the installer for your architecture. The installer includes the .NET runtime. EXE setup suggests a language based on Windows and uses your selection as the app's initial language. You can change it under **Settings → Language**.
 2. Turn on the printer, connect the PC to the same local network, and open PrintBridge. Use **Automatic** to search connected Wi-Fi and Ethernet adapters, or select an adapter manually. Select the Windows queue and verify the physical printer.
 3. Choose **Create a separate queue** to keep the original queue available or **Switch the selected queue** to keep using its existing name. Approve the Windows request to change the queue or create its port.
 4. Print a test page and check the physical output. For normal printing, select the Windows queue you connected in the wizard.
 
 Closing the window sends PrintBridge to the tray. You can enable automatic startup under **Settings**. To remove the integration, choose **Restore original port**. The EXE uninstaller also offers to clean up the queue integration before removing the app. A per-user upgrade preserves the profile and any language saved in Settings.
+
+PrintBridge and EXE setup support English, Dutch, French, German, Italian, Japanese, Korean, Polish, Brazilian Portuguese, Russian, Serbian (Cyrillic), Simplified Chinese, Spanish, Turkish, and Ukrainian. The MSI setup runs in English. The installed app offers the same language options with either installer.
 
 Releases include a direct EXE download, a ZIP containing the same EXE, and an MSI for Windows Installer deployments. Use the same installer type for upgrades. To switch between EXE and MSI, restore the original port, uninstall PrintBridge, and then install the other package. Restore the original port before uninstalling the MSI.
 

@@ -6,5 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup><EmbeddedResource Include="Localization.ru.json" WithCulture="false" LogicalName="PrintBridge.Localization.ru.json" /></ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Localization.*.json" WithCulture="false" LogicalName="PrintBridge.%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
