@@ -22,7 +22,13 @@ public sealed class GitHubUpdateService
         Http.DefaultRequestHeaders.UserAgent.ParseAdd("PrintBridge-Updater");
     }
 
-    public async Task<string?> DownloadAsync(Version current, bool msi, CancellationToken token)
+    public async Task<Version?> CheckAsync(Version current, bool msi, CancellationToken token)
+    {
+        var update = await FindAsync(current, msi, token).ConfigureAwait(false);
+        return update?.Version;
+    }
+
+    private static async Task<(Version Version, ReleaseAsset Asset)?> FindAsync(Version current, bool msi, CancellationToken token)
     {
         var release = await Http.GetFromJsonAsync<GitHubRelease>(
             $"https://api.github.com/repos/{Repository}/releases/latest", token).ConfigureAwait(false);
@@ -36,8 +42,15 @@ public sealed class GitHubUpdateService
             return null;
 
         var asset = SelectAsset(release, current, runtime, msi);
-        if (asset is null)
+        return asset is null ? null : (Version.Parse(release.Tag.AsSpan(1)), asset);
+    }
+
+    public async Task<string?> DownloadAsync(Version current, bool msi, CancellationToken token)
+    {
+        var update = await FindAsync(current, msi, token).ConfigureAwait(false);
+        if (update is null)
             return null;
+        var asset = update.Value.Asset;
 
         string folder = Path.Combine(SettingsService.Folder, "Updates");
         Directory.CreateDirectory(folder);

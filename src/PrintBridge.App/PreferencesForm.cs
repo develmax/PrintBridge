@@ -93,6 +93,36 @@ internal sealed class PreferencesForm : Form
         search = Check(T("Find new IP addresses automatically"), settings.AutoDiscover);
         verbose = Check(T("Verbose logging"), settings.Verbose);
         autoUpdate = Check(T("Automatically check for and install updates"), settings.AutoUpdate);
+        var checkUpdate = new Button { AutoSize = true, Text = T("Check for updates now") };
+        checkUpdate.Click += async (_, _) =>
+        {
+            checkUpdate.Enabled = false;
+            try
+            {
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                bool msi = File.Exists(Path.Combine(AppContext.BaseDirectory, "msi-installation.txt"));
+                var version = await new GitHubUpdateService().CheckAsync(Version.Parse(Program.Version), msi, deadline.Token);
+                if (IsDisposed || Disposing)
+                    return;
+                if (version is null)
+                    MessageBox.Show(this, T("No newer compatible release is available."), Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                else if (MessageBox.Show(this, F("PrintBridge {0} is available. Open the release page?", version), Text,
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AboutForm.RepositoryUrl + $"/releases/tag/v{version}") { UseShellExecute = true });
+            }
+            catch (Exception)
+            {
+                if (!IsDisposed && !Disposing)
+                    MessageBox.Show(this, T("Could not check for updates. Try again later."), Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                if (!IsDisposed && !Disposing)
+                    checkUpdate.Enabled = true;
+            }
+        };
+        body.Controls.Add(checkUpdate);
+        body.SetColumnSpan(checkUpdate, 2);
         interval = Number(T("Check interval (seconds)"), settings.IntervalSeconds, 15, 3600);
         local = Number(T("Local port"), settings.LocalPort, 1024, 65535);
         local.Enabled = settings.Profile == null;

@@ -1,5 +1,9 @@
 {
   "Automatically check for and install updates": "Автоматически проверять и устанавливать обновления",
+  "Check for updates now": "Проверить обновления сейчас",
+  "No newer compatible release is available.": "Более новой совместимой версии нет.",
+  "PrintBridge {0} is available. Open the release page?": "Доступен PrintBridge {0}. Открыть страницу релиза?",
+  "Could not check for updates. Try again later.": "Не удалось проверить обновления. Повторите попытку позже.",
   "Select a printer": "Выберите принтер",
   "Select a printer.": "Выберите принтер.",
   "Select a printer and connect its Windows queue.": "Выберите принтер и подключите очередь Windows.",

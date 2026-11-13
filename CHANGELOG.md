@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2
+
+- Added **Check for updates now** in Settings. It works independently of the automatic update setting.
+
 ## 1.2.1
 
 - Added **Report a bug**, with a redacted diagnostic preview, copy and save actions, and a prefilled GitHub issue draft.
