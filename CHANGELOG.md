@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.5
+
+- Smoothed toolbar and menu icons and added a connection indicator beside the PrintBridge title.
+- Displayed Wi-Fi and Windows routes on separate lines, followed by a list of detected VPN interfaces.
+
 ## 1.2.4
 
 - Reduced idle printer checks to once every five minutes by default. Incoming jobs still connect immediately and retry if needed.

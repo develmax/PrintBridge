@@ -51,7 +51,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private string? previousStatus;
 
-    private int lastColor = -1;
+    private Color lastColor = Color.Empty;
 
     private Icon? icon;
 
@@ -361,20 +361,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
         MonitorState state = dashboard.Monitor.State;
         status.Text = state.Message;
         toggle.Text = (dashboard.Monitor.Paused ? T("Start bridge") : T("Stop bridge"));
-        int color = ((!dashboard.Monitor.Paused && dashboard.Settings.Profile != null) ? (state.Searching ? 1 : ((state.Available && dashboard.Bridge.LastError == null) ? 2 : 3)) : 0);
+        Color color = dashboard.StatusColor;
         if (color != lastColor)
         {
-            Color tint = color switch
-            {
-                1 => Color.Goldenrod,
-                2 => Color.ForestGreen,
-                3 => Color.Firebrick,
-                _ => Color.Gray,
-            };
             using Bitmap bitmap = (dashboard.Icon ?? SystemIcons.Application).ToBitmap();
             using (Graphics graphics = Graphics.FromImage(bitmap))
             {
-                using SolidBrush fill = new SolidBrush(tint);
+                using SolidBrush fill = new SolidBrush(color);
                 graphics.FillEllipse(fill, bitmap.Width - 14, bitmap.Height - 14, 13, 13);
             }
             nint handle = bitmap.GetHicon();

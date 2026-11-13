@@ -2,6 +2,7 @@
 
 [![Build and tests](https://github.com/develmax/PrintBridge/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/develmax/PrintBridge/actions/workflows/build.yml)
 [![CodeQL](https://github.com/develmax/PrintBridge/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/develmax/PrintBridge/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/develmax/PrintBridge/badge)](https://scorecard.dev/viewer/?uri=github.com/develmax/PrintBridge)
 [![Latest release](https://img.shields.io/github/v/release/develmax/PrintBridge?label=release)](https://github.com/develmax/PrintBridge/releases/latest)
 
 PrintBridge is a Windows utility that routes RAW printing to a network printer over your local Wi-Fi. It helps when a VPN changes Windows routing or a printer receives a new IP address. It runs in the system tray and uses your installed Windows printer driver.

@@ -280,18 +280,29 @@ public sealed class RoutingDiagnosticsService
             }
             return flag;
         });
-        string vpn = string.Join(", ", tunnels.Select((NetworkInterface nic) => nic.Name));
+        string[] vpn = tunnels.Select(nic => nic.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var lines = new List<string>();
         if (adapter == null || address == null)
         {
-            return $"{T("VPN interfaces")}: " + ((vpn.Length == 0) ? T("none detected") : vpn) + $". {T("Waiting for a printer address.")}";
+            lines.Add(T("Waiting for a printer address."));
         }
-        SockAddr destination = SockAddr.From(address);
-        int error = GetBestInterfaceEx(ref destination, out var index);
-        string route = ((error == 0) ? $"{T("default route lookup: interface")} {index}" : $"{T("Windows route lookup error")} {error}");
-        SockAddr source = SockAddr.From(adapter.Address);
-        int pinned = GetBestRoute2(IntPtr.Zero, (uint)adapter.Index, ref source, ref destination, 0u, out var best, out var _);
-        string wifiRoute = ((pinned == 0) ? $"{T("Wi-Fi route")} {best.Index}, {T("route metric")} {best.Metric}" : $"{T("Wi-Fi")} {adapter.Index} {T("returned Windows code")} {pinned}");
-        return $"{T("VPN interfaces")}: {((vpn.Length == 0) ? T("none detected") : vpn)}; {route}; {wifiRoute}.";
+        else
+        {
+            SockAddr destination = SockAddr.From(address);
+            SockAddr source = SockAddr.From(adapter.Address);
+            int pinned = GetBestRoute2(IntPtr.Zero, (uint)adapter.Index, ref source, ref destination, 0u, out var best, out _);
+            lines.Add(pinned == 0
+                ? F("PrintBridge Wi-Fi route: interface {0}, metric {1}", best.Index, best.Metric)
+                : F("PrintBridge Wi-Fi route: interface {0}, Windows error {1}", adapter.Index, pinned));
+            int error = GetBestInterfaceEx(ref destination, out var index);
+            lines.Add(error == 0
+                ? F("Windows default route to the printer: interface {0}", index)
+                : F("Windows default route lookup failed: error {0}", error));
+        }
+        lines.Add("");
+        lines.Add(vpn.Length == 0 ? $"{T("Detected VPN interfaces")}: {T("none detected")}" : $"{T("Detected VPN interfaces")}:");
+        lines.AddRange(vpn.Select(name => $"  • {name}"));
+        return string.Join(Environment.NewLine, lines);
     }
 
     public static bool IsHardware(int index)

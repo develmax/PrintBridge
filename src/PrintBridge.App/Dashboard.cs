@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +42,8 @@ internal sealed class Dashboard : Form
     private readonly ToolTip portTip = new ToolTip();
 
     private readonly Label[] values = new Label[3];
+    private readonly PictureBox statusIndicator = new() { Size = new Size(16, 16), Margin = new Padding(3, 12, 5, 0) };
+    private Color indicatorColor;
 
     private readonly TextBox bridgeDetails = ScrollableDetails(T("TCP bridge details"));
 
@@ -71,6 +74,8 @@ internal sealed class Dashboard : Form
     private readonly ToolStripMenuItem choosePrinter;
     private readonly ContextMenuStrip moreActions = new();
     private readonly Font commandIconFont = new("Segoe MDL2 Assets", 11f);
+    private readonly Dictionary<ToolStripMenuItem, string> menuGlyphs = new();
+    private readonly Dictionary<Button, string> buttonGlyphs = new();
 
     private bool exiting;
 
@@ -87,6 +92,10 @@ internal sealed class Dashboard : Form
     public PrinterMonitorService Monitor { get; }
 
     public TcpBridgeService Bridge { get; }
+    public Color StatusColor => Monitor.Paused || Settings.Profile == null ? Color.Gray
+        : Monitor.State.Searching ? Color.Goldenrod
+        : Monitor.State.Available && Bridge.LastError == null ? Color.ForestGreen
+        : Color.Firebrick;
 
     public event Action? StatusChanged;
 
@@ -131,12 +140,22 @@ internal sealed class Dashboard : Form
         };
         Controls.Add(body);
         Controls.Add(progress);
-        body.Controls.Add(new Label
+        var header = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
+        statusIndicator.Paint += (_, e) =>
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            int inset = LogicalToDeviceUnits(3);
+            using var brush = new SolidBrush(StatusColor);
+            e.Graphics.FillEllipse(brush, inset, inset, statusIndicator.Width - 2 * inset, statusIndicator.Height - 2 * inset);
+        };
+        header.Controls.Add(statusIndicator);
+        header.Controls.Add(new Label
         {
             Text = "PrintBridge",
             Font = new Font(Font.FontFamily, 22f, FontStyle.Bold),
             AutoSize = true
         });
+        body.Controls.Add(header);
         headline.Font = new Font(Font.FontFamily, 11f, FontStyle.Bold);
         headline.Margin = new Padding(3, 12, 3, 8);
         body.Controls.Add(headline);
@@ -178,19 +197,22 @@ internal sealed class Dashboard : Form
         more.Click += (_, _) => moreActions.Show(more, new Point(0, more.Height));
         more.ContextMenuStrip = moreActions;
 
-        choosePrinter = AddMenu(T("Choose another printer"), ConfigureAsync);
-        AddMenu(T("Find printer"), () => CheckAsync(force: true));
-        AddMenu(T("Restart bridge"), RestartAsync);
-        restore = AddMenu(T("Restore original port"), RestoreAsync);
+        choosePrinter = AddMenu(T("Choose another printer"), ConfigureAsync, "\uE749");
+        AddMenu(T("Find printer"), () => CheckAsync(force: true), "\uE721");
+        AddMenu(T("Restart bridge"), RestartAsync, "\uE72C");
+        restore = AddMenu(T("Restore original port"), RestoreAsync, "\uE7A7");
         moreActions.Items.Add(new ToolStripSeparator());
-        AddMenu(T("Diagnostics"), ExportAsync);
-        AddMenu(T("Report a bug"), ReportBugAsync);
+        AddMenu(T("Diagnostics"), ExportAsync, "\uE9D9");
+        AddMenu(T("Report a bug"), ReportBugAsync, "\uE939");
         AddMenu(T("Open logs"), () =>
         {
             OpenLogs();
             return Task.CompletedTask;
-        });
-        AddMenu(T("About"), () => { using var about = new AboutForm(); about.ShowDialog(this); return Task.CompletedTask; });
+        }, "\uE8B7");
+        AddMenu(T("About"), () => { using var about = new AboutForm(); about.ShowDialog(this); return Task.CompletedTask; }, "\uE946");
+        RefreshCommandIcons();
+        DpiChanged += (_, _) => RefreshCommandIcons();
+        SystemColorsChanged += (_, _) => RefreshCommandIcons();
         Monitor.Changed += Render;
         Render();
     }
@@ -237,28 +259,51 @@ internal sealed class Dashboard : Form
             Text = title,
             AutoSize = true,
             Padding = new Padding(6, 3, 6, 3),
-            TextImageRelation = TextImageRelation.ImageBeforeText,
-            Image = CreateCommandIcon(glyph)
+            TextImageRelation = TextImageRelation.ImageBeforeText
         };
+        buttonGlyphs.Add(button, glyph);
         actions.Controls.Add(button);
         return button;
     }
 
-    private Bitmap CreateCommandIcon(string glyph)
+    private void RefreshCommandIcons()
     {
         int size = LogicalToDeviceUnits(18);
+        moreActions.ImageScalingSize = new Size(size, size);
+        foreach (var (button, glyph) in buttonGlyphs)
+        {
+            var old = button.Image;
+            button.Image = CreateCommandIcon(glyph, size, SystemColors.ControlText);
+            old?.Dispose();
+        }
+        foreach (var (item, glyph) in menuGlyphs)
+        {
+            var old = item.Image;
+            item.Image = CreateCommandIcon(glyph, size, SystemColors.MenuText);
+            old?.Dispose();
+        }
+    }
+
+    private Bitmap CreateCommandIcon(string glyph, int size, Color color)
+    {
         var image = new Bitmap(size, size);
-        image.SetResolution(DeviceDpi, DeviceDpi);
         using var graphics = Graphics.FromImage(image);
-        TextRenderer.DrawText(graphics, glyph, commandIconFont, new Rectangle(0, 0, size, size),
-            SystemColors.ControlText, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        using var path = new GraphicsPath();
+        path.AddString(glyph, commandIconFont.FontFamily, (int)FontStyle.Regular, size * 0.8f, PointF.Empty, StringFormat.GenericTypographic);
+        RectangleF bounds = path.GetBounds();
+        using var brush = new SolidBrush(color);
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        graphics.TranslateTransform((size - bounds.Width) / 2 - bounds.X, (size - bounds.Height) / 2 - bounds.Y);
+        graphics.FillPath(brush, path);
         return image;
     }
 
-    private ToolStripMenuItem AddMenu(string title, Func<Task> click)
+    private ToolStripMenuItem AddMenu(string title, Func<Task> click, string glyph)
     {
         var item = new ToolStripMenuItem(title);
         item.Click += async (_, _) => await click();
+        menuGlyphs.Add(item, glyph);
         moreActions.Items.Add(item);
         return item;
     }
@@ -268,6 +313,11 @@ internal sealed class Dashboard : Form
         MonitorState state = Monitor.State;
         PrintPlan? plan = Settings.Profile?.Print ?? Pending;
         headline.Text = ((Pending != null) ? T("Setup did not finish. Restore the queue to continue.") : state.Message);
+        if (indicatorColor != StatusColor)
+        {
+            indicatorColor = StatusColor;
+            statusIndicator.Invalidate();
+        }
         string? currentPort = state.Queue?.Port;
         bool usesBridge = plan is not null && SpoolerState.Same(currentPort, plan.PortName);
         string portLabel = usesBridge && plan is { ShortPortName: false }
@@ -620,6 +670,8 @@ internal sealed class Dashboard : Form
         if (disposing)
         {
             portTip.Dispose();
+            foreach (var item in menuGlyphs.Keys)
+                item.Image?.Dispose();
             moreActions.Dispose();
             commandIconFont.Dispose();
             foreach (Button button in actions.Controls)
