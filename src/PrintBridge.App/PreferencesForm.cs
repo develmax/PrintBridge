@@ -65,7 +65,7 @@ internal sealed class PreferencesForm : Form
 
     public bool StartupEnabled => startup.Checked;
 
-    public PreferencesForm(AppSettings settings, bool runAtStartup, IReadOnlyList<WifiAdapter> adapters, Action clean,
+    public PreferencesForm(AppSettings settings, bool runAtStartup, IReadOnlyList<LanAdapter> adapters, Action clean,
         Func<IWin32Window, Task> checkUpdates)
     {
         PreferencesForm preferencesForm = this;
@@ -117,7 +117,7 @@ internal sealed class PreferencesForm : Form
         idle = Number(T("Idle timeout (seconds)"), settings.IdleSeconds, 15, 1800);
         limit = Number(T("Concurrent connections"), settings.MaxConnections, 1, 16);
         wifi.Items.Add(new AdapterChoice(null, T("Automatic")));
-        foreach (WifiAdapter adapter in adapters.DistinctBy((WifiAdapter a) => a.Id))
+        foreach (LanAdapter adapter in adapters.DistinctBy((LanAdapter a) => a.Id))
         {
             wifi.Items.Add(new AdapterChoice(adapter.Id, adapter.ToString()));
         }
@@ -125,7 +125,7 @@ internal sealed class PreferencesForm : Form
         if (adapter2.HasValue)
         {
             Guid id = adapter2.GetValueOrDefault();
-            if (!adapters.Any((WifiAdapter a) => a.Id == id))
+            if (!adapters.Any((LanAdapter a) => a.Id == id))
             {
                 wifi.Items.Add(new AdapterChoice(id, T("Saved adapter unavailable")));
             }
@@ -140,7 +140,7 @@ internal sealed class PreferencesForm : Form
             }
             return !id2.HasValue || id2.GetValueOrDefault() == adapter3.GetValueOrDefault();
         });
-        Row(T("Wi-Fi adapter"), wifi);
+        Row(T("Network adapter"), wifi);
         Row(T("Print protocol"), new Label
         {
             Text = "RAW TCP/9100",

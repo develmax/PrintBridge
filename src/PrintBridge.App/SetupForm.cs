@@ -8,10 +8,20 @@ using System.Windows.Forms;
 
 namespace PrintBridge;
 
-internal sealed record SetupSelection(WifiAdapter Adapter, PrinterQueue Queue, NetworkPrinter Device, bool Separate);
+internal sealed record SetupSelection(LanAdapter Adapter, PrinterQueue Queue, NetworkPrinter Device, bool Separate);
 
 internal sealed class SetupForm : Form
 {
+    private sealed record AdapterChoice(Guid? Id, string Name)
+    {
+        public override string ToString() => Name;
+    }
+
+    private sealed record DeviceChoice(LanAdapter Adapter, NetworkPrinter Printer)
+    {
+        public override string ToString() => $"{Printer} · {Adapter.ConnectionType} · {Adapter.Name}";
+    }
+
     private readonly NetworkAdapterService adapters;
 
     private readonly WindowsPrinterService windows;
@@ -125,7 +135,7 @@ internal sealed class SetupForm : Form
             Font = new Font(Font.FontFamily, 17f, FontStyle.Bold)
         };
         body.Controls.Add(title);
-        AddField(body, T("Wi-Fi adapter"), wifi);
+        AddField(body, T("Network adapter"), wifi);
         AddField(body, T("Installed Windows queue"), queues);
         AddField(body, T("Physical device"), devices);
         body.Controls.Add(separate);
@@ -178,10 +188,11 @@ internal sealed class SetupForm : Form
         };
         connect.Click += (object? _, EventArgs _) =>
         {
-            if (setupForm.wifi.SelectedItem is WifiAdapter wifiAdapter && setupForm.queues.SelectedItem is PrinterQueue queue && setupForm.devices.SelectedItem is NetworkPrinter device && setupForm.connect.Enabled)
+            if (setupForm.wifi.SelectedItem is AdapterChoice choice && setupForm.queues.SelectedItem is PrinterQueue queue &&
+                setupForm.devices.SelectedItem is DeviceChoice device && setupForm.connect.Enabled)
             {
-                setupForm.Selection = new SetupSelection(wifiAdapter, queue, device, setupForm.separate.Checked);
-                setupForm.AdapterOverride = ((setupForm.wifi.Items.Count > 1 || settings.Adapter.HasValue) ? new Guid?(wifiAdapter.Id) : ((Guid?)null));
+                setupForm.Selection = new SetupSelection(device.Adapter, queue, device.Printer, setupForm.separate.Checked);
+                setupForm.AdapterOverride = choice.Id;
                 setupForm.DialogResult = DialogResult.OK;
             }
         };
@@ -217,10 +228,11 @@ internal sealed class SetupForm : Form
         compatible.Checked = false;
         if (queues.SelectedItem is PrinterQueue queue)
         {
-            NetworkPrinter? suggestion = identity.Suggest(queue, devices.Items.Cast<NetworkPrinter>());
+            var choices = devices.Items.Cast<DeviceChoice>();
+            NetworkPrinter? suggestion = identity.Suggest(queue, choices.Select(choice => choice.Printer));
             if (suggestion != null)
             {
-                devices.SelectedItem = suggestion;
+                devices.SelectedItem = choices.First(choice => choice.Printer == suggestion);
             }
         }
         ValidateSelection();
@@ -229,7 +241,7 @@ internal sealed class SetupForm : Form
     private void ValidateSelection()
     {
         bool canConnect = false;
-        if (devices.SelectedItem is NetworkPrinter device)
+        if (devices.SelectedItem is DeviceChoice { Printer: var device })
         {
             if (!device.Raw)
             {
@@ -274,39 +286,42 @@ internal sealed class SetupForm : Form
         bool enabled = (comboBox.Enabled = flag5);
         button.Enabled = enabled;
         progress.Visible = true;
-        status.Text = T("Finding Wi-Fi adapters, queues, and network printers…");
+        status.Text = T("Finding network adapters, queues, and printers…");
         try
         {
             CancellationToken token = cancellation.Token;
-            WifiAdapter? obj = wifi.SelectedItem as WifiAdapter;
-            Guid? selectedAdapter = ((obj != null) ? new Guid?(obj.Id) : settings.Adapter);
-            if (!closing)
-            {
-                IReadOnlyList<WifiAdapter> interfaces = await Task.Run((Func<IReadOnlyList<WifiAdapter>>)adapters.GetAdapters, token);
-                wifi.Items.Clear();
-                wifi.Items.AddRange(interfaces.Cast<object>().ToArray());
-                wifi.SelectedItem = interfaces.FirstOrDefault((WifiAdapter a) =>
-                {
-                    Guid id = a.Id;
-                    Guid? guid = selectedAdapter;
-                    return id == guid;
-                }) ?? interfaces.FirstOrDefault();
-            }
+            Guid? selectedAdapter = wifi.SelectedItem is AdapterChoice choice ? choice.Id : settings.Adapter;
+            var interfaces = await Task.Run(adapters.GetAdapters, token);
+            wifi.Items.Clear();
+            wifi.Items.Add(new AdapterChoice(null, T("Automatic")));
+            foreach (var item in interfaces.DistinctBy(item => item.Id))
+                wifi.Items.Add(new AdapterChoice(item.Id, item.ToString()));
+            if (selectedAdapter is Guid saved && !interfaces.Any(item => item.Id == saved))
+                wifi.Items.Add(new AdapterChoice(saved, T("Saved adapter unavailable")));
+            wifi.SelectedItem = wifi.Items.Cast<AdapterChoice>().First(item => item.Id == selectedAdapter);
             SpoolerState spool = await Task.Run((Func<SpoolerState>)windows.Read, token);
             string? previous = (queues.SelectedItem as PrinterQueue)?.Name;
             PrinterQueue[] available = spool.Queues.Where((PrinterQueue queue) => queue.Local && !queue.Port.StartsWith("PrintBridge_", StringComparison.OrdinalIgnoreCase)).ToArray();
             queues.Items.Clear();
             queues.Items.AddRange(available.Cast<object>().ToArray());
             queues.SelectedItem = available.FirstOrDefault((PrinterQueue q) => q.Name == previous) ?? ((available.Length == 1) ? available[0] : null);
-            if (!(wifi.SelectedItem is WifiAdapter adapter))
+            var selected = LanAdapter.OrderForPrinter(interfaces, selectedAdapter, settings.Profile?.LastAdapter, null);
+            if (selected.Length == 0)
             {
-                status.Text = T("Connect to Wi-Fi and try again.");
+                status.Text = T("Connect to the selected local network and try again.");
                 return;
             }
             devices.Items.Clear();
-            status.Text = T("Searching the local Wi-Fi network…");
-            IReadOnlyList<NetworkPrinter> found = await discovery.FindAsync(adapter, available.Select((PrinterQueue q) => q.Host).OfType<string>(), scan: true, token);
-            devices.Items.AddRange(found.Cast<object>().ToArray());
+            status.Text = T("Searching the local network…");
+            var hints = available.Select(q => q.Host).OfType<string>().ToArray();
+            var paths = new List<DeviceChoice>();
+            foreach (var adapter in selected)
+            {
+                foreach (var printer in await discovery.FindAsync(adapter, hints, scan: true, token))
+                    paths.Add(new DeviceChoice(adapter, printer));
+            }
+            devices.Items.AddRange(paths.Cast<object>().ToArray());
+            var found = paths.Select(path => path.Printer).ToArray();
             if (queues.SelectedIndex == -1)
             {
                 PrinterQueue[] matching = available.Where((PrinterQueue q) => identity.Suggest(q, found) != null).Take(2).ToArray();
@@ -318,7 +333,7 @@ internal sealed class SetupForm : Form
             Suggest();
             if (devices.SelectedIndex == -1)
             {
-                status.Text = ((found.Count == 0) ? T("No devices found. Check that the printer is on and reachable from this network.") : F("Found {0} devices. Select a queue and verify the physical printer.", found.Count));
+                status.Text = ((found.Length == 0) ? T("No devices found. Check that the printer is on and reachable from this network.") : F("Found {0} printer connections. Select a queue and verify the physical printer.", found.Length));
             }
         }
         catch (OperationCanceledException)

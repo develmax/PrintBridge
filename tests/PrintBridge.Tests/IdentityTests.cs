@@ -4,6 +4,20 @@ namespace PrintBridge.Tests;
 
 public sealed class IdentityTests
 {
+    [Fact]
+    public void AutomaticAdapterSelectionPrefersThePrinterSubnetAndTheLastWorkingAdapter()
+    {
+        var printer = IPAddress.Parse("192.0.2.42");
+        var wifi = new LanAdapter(Guid.NewGuid(), "Wi-Fi", "Wireless", 1, IPAddress.Parse("192.0.2.10"), 24, null, null, 1);
+        var ethernet = wifi with { Id = Guid.NewGuid(), Name = "Ethernet", Index = 2, IsWireless = false };
+        var other = ethernet with { Id = Guid.NewGuid(), Index = 3, Address = IPAddress.Parse("198.51.100.10") };
+
+        Assert.Equal(new[] { ethernet, wifi, other }, LanAdapter.OrderForPrinter([other, wifi, ethernet], null, ethernet.Id, printer));
+        Assert.Equal(new[] { wifi, ethernet, other }, LanAdapter.OrderForPrinter([other, wifi, ethernet], null, other.Id, printer));
+        Assert.Equal(new[] { other }, LanAdapter.OrderForPrinter([wifi, ethernet, other], other.Id, wifi.Id, printer));
+        Assert.Empty(LanAdapter.OrderForPrinter([wifi, ethernet], other.Id, null, printer));
+    }
+
     private readonly PrinterIdentityService service = new();
     private static NetworkPrinter Canon(string address, string? mac = "00AABB112233", string? serial = null, bool raw = true) =>
         new(IPAddress.Parse(address), "canon.local", "Canon", mac, serial, null, raw, true, false, "fixture");
@@ -43,7 +57,7 @@ public sealed class IdentityTests
     [InlineData("10.40.7.16", 31, "10.40.7.17", true, 1)]
     public void ScanRespectsPrefixAndLimitsLargeNetworks(string local, int prefix, string peer, bool contains, int count)
     {
-        var adapter = new WifiAdapter(Guid.NewGuid(), "renamed", "Wi-Fi", 7, IPAddress.Parse(local), prefix, null, null, 1);
+        var adapter = new LanAdapter(Guid.NewGuid(), "renamed", "Wi-Fi", 7, IPAddress.Parse(local), prefix, null, null, 1);
         Assert.Equal(contains, adapter.Contains(IPAddress.Parse(peer)));
         var addresses = adapter.ScanAddresses(254).ToArray();
         Assert.Equal(count, addresses.Length);

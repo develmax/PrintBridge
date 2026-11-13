@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace PrintBridge;
 
-public sealed record MonitorState(string Message, bool Searching = false, bool Available = false, WifiAdapter? Adapter = null, NetworkPrinter? Printer = null, PrinterQueue? Queue = null, string? Route = null);
+public sealed record MonitorState(string Message, bool Searching = false, bool Available = false, LanAdapter? Adapter = null, NetworkPrinter? Printer = null, PrinterQueue? Queue = null, string? Route = null);
 
 public sealed class PrinterMonitorService(SettingsService storage, NetworkAdapterService network, PrinterDiscoveryService discovery, PrinterIdentityService identities, WindowsPrinterService windows, RoutingDiagnosticsService routing, TcpBridgeService bridge, ILogger<PrinterMonitorService> logger)
 {
@@ -23,6 +23,7 @@ public sealed class PrinterMonitorService(SettingsService storage, NetworkAdapte
     private string? lastRoute;
 
     private bool previouslyAvailable;
+    private LanAdapter[] printAdapters = [];
 
     public MonitorState State { get; private set; } = new MonitorState(T("Select a printer."));
 
@@ -63,99 +64,84 @@ public sealed class PrinterMonitorService(SettingsService storage, NetworkAdapte
             Searching = true,
             Message = T("Checking connection…")
         });
-        WifiAdapter? adapter = null;
+        LanAdapter? adapter = null;
         PrinterQueue? queue = null;
         string? route = null;
         try
         {
-            Task<IReadOnlyList<WifiAdapter>> wifiTask = Task.Run((Func<IReadOnlyList<WifiAdapter>>)network.GetAdapters, token);
-            Task<SpoolerState> spoolTask = Task.Run((Func<SpoolerState>)windows.Read, token);
-            await Task.WhenAll(wifiTask, spoolTask);
-            IReadOnlyList<WifiAdapter> wifi = await wifiTask;
-            SpoolerState spool = await spoolTask;
+            var adaptersTask = Task.Run(network.GetAdapters, token);
+            var spoolTask = Task.Run(windows.Read, token);
+            await Task.WhenAll(adaptersTask, spoolTask);
+            var spool = await spoolTask;
             queue = spool.Queue(profile.Print.Queue);
-            BridgeTarget? previous = bridge.Target;
-            Guid? adapter2 = settings.Adapter;
-            WifiAdapter? wifiAdapter;
-            if (adapter2.HasValue)
-            {
-                Guid id = adapter2.GetValueOrDefault();
-                wifiAdapter = wifi.FirstOrDefault((WifiAdapter item) => item.Id == id);
-            }
-            else
-            {
-                wifiAdapter = wifi.FirstOrDefault((WifiAdapter item) =>
-                {
-                    Guid id3 = item.Id;
-                    Guid? guid = previous?.Adapter.Id;
-                    return id3 == guid;
-                }) ?? wifi.FirstOrDefault((WifiAdapter item) => IPAddress.TryParse(profile.Identity.LastAddress, out IPAddress? address) && item.Contains(address)) ?? wifi.FirstOrDefault();
-            }
-            adapter = wifiAdapter;
             if (!WindowsPrinterIntegrationService.Verify(profile.Print, spool))
             {
                 bridge.SetTarget(null);
-                Update(new MonitorState(T("The Windows queue or port is missing or has changed. Check the queue configuration."), Searching: false, Available: false, null, null, queue));
+                Update(new MonitorState(T("The Windows queue or port is missing or has changed. Check the queue configuration."), Queue: queue));
                 return;
             }
-            EnsureListener(settings, profile.Print.LocalPort);
+
+            IPAddress.TryParse(profile.Identity.LastAddress, out var current);
+            var candidates = LanAdapter.OrderForPrinter(await adaptersTask, settings.Adapter, profile.LastAdapter, current);
+            Volatile.Write(ref printAdapters, candidates);
+            adapter = candidates.FirstOrDefault();
             if (adapter == null)
             {
                 bridge.SetTarget(null);
-                Update(new MonitorState(T("Waiting for the selected Wi-Fi connection."), Searching: false, Available: false, null, null, queue));
+                Update(new MonitorState(T("Waiting for the selected local network connection."), Queue: queue));
                 previouslyAvailable = false;
                 return;
             }
-            IPAddress? current = (IPAddress.TryParse(profile.Identity.LastAddress, out IPAddress? parsed) ? parsed : null);
-            if (previous != null && (previous.Adapter.Id != adapter.Id || !previous.Adapter.Address.Equals(adapter.Address)))
+
+            EnsureListener(settings, profile.Print.LocalPort);
+            var fallback = current == null ? null : candidates.FirstOrDefault(item => RoutingDiagnosticsService.IsCandidate(item, current));
+            bridge.SetTarget(fallback == null ? null : new BridgeTarget(fallback,
+                new NetworkPrinter(current!, profile.Identity.Host, profile.Identity.Model, null, null, null,
+                    Raw: false, Ipp: false, Lpr: false, T("Saved address")), profile.Identity));
+
+            NetworkPrinter? candidate = null;
+            foreach (var item in candidates)
             {
-                bridge.SetTarget(null);
+                if (current == null || !RoutingDiagnosticsService.IsCandidate(item, current))
+                    continue;
+                var observed = await discovery.CheckAddressAsync(item, current, token);
+                if (observed is { Raw: true } && identities.Matches(profile.Identity, observed))
+                {
+                    adapter = item;
+                    candidate = observed;
+                    break;
+                }
             }
-            if (current != null && RoutingDiagnosticsService.IsCandidate(adapter, current))
+
+            bool adapterChanged = adapter.Id != lastAdapter || adapter.Address.ToString() != lastAddress;
+            if ((candidate == null && (settings.AutoDiscover || force || adapterChanged)) || force)
             {
-                NetworkPrinter known = new NetworkPrinter(current, profile.Identity.Host, profile.Identity.Model, null, null, null, Raw: false, Ipp: false, Lpr: false, T("Saved address"));
-                bridge.SetTarget(new BridgeTarget(adapter, known, profile.Identity));
+                bool scan = DateTimeOffset.UtcNow >= nextScan;
+                if (scan)
+                    nextScan = DateTimeOffset.UtcNow.AddMinutes(2);
+                var hints = new[] { profile.Identity.LastAddress, profile.Identity.Host, queue?.Host }.OfType<string>().ToArray();
+                foreach (var item in candidates)
+                {
+                    var observed = identities.Resolve(profile.Identity, await discovery.FindAsync(item, hints, scan, token));
+                    if (observed == null)
+                        continue;
+                    adapter = item;
+                    candidate = observed;
+                    break;
+                }
             }
-            else
+
+            if (adapter.Id != lastAdapter || adapter.Address.ToString() != lastAddress)
             {
-                bridge.SetTarget(null);
-            }
-            route = routing.Describe(adapter, current);
-            Guid id2 = adapter.Id;
-            adapter2 = lastAdapter;
-            if (id2 != adapter2 || adapter.Address.ToString() != lastAddress)
-            {
-                logger.LogInformation("Wi-Fi {Index}, {Address}/{Prefix}", adapter.Index, adapter.Address, adapter.Prefix);
+                logger.LogInformation("{ConnectionType} {Index}, {Address}/{Prefix}", adapter.ConnectionType, adapter.Index, adapter.Address, adapter.Prefix);
                 lastAdapter = adapter.Id;
                 lastAddress = adapter.Address.ToString();
-                force = true;
             }
+            route = routing.Describe(adapter, candidate?.Address ?? current);
             if (route != lastRoute)
             {
                 logger.LogInformation("{Route}", route);
                 lastRoute = route;
-            }
-            NetworkPrinter? networkPrinter = current is null || force ? null : await discovery.CheckAddressAsync(adapter, current, token);
-            NetworkPrinter? candidate = networkPrinter;
-            if (candidate == null || !candidate.Raw || !identities.Matches(profile.Identity, candidate))
-            {
-                candidate = null;
-                if (settings.AutoDiscover | force)
-                {
-                    bool scan = DateTimeOffset.UtcNow >= nextScan;
-                    if (scan)
-                    {
-                        nextScan = DateTimeOffset.UtcNow.AddMinutes(2.0);
-                    }
-                    IEnumerable<string> hints = new string?[3]
-                    {
-                        profile.Identity.LastAddress,
-                        profile.Identity.Host,
-                        queue?.Host
-                    }.OfType<string>();
-                    IReadOnlyList<NetworkPrinter> found = await discovery.FindAsync(adapter, hints, scan, token);
-                    candidate = identities.Resolve(profile.Identity, found);
-                }
             }
             if (candidate == null)
             {
@@ -167,11 +153,13 @@ public sealed class PrinterMonitorService(SettingsService storage, NetworkAdapte
                 Update(new MonitorState(T("The confirmed printer is unavailable. A VPN or firewall may be blocking local TCP."), Searching: false, Available: false, adapter, null, queue, route));
                 return;
             }
-            if (!candidate.Address.Equals(current))
+            if (!candidate.Address.Equals(current) || profile.LastAdapter != adapter.Id)
             {
-                logger.LogInformation("Printer IP changed from {Previous} to {Current}", current, candidate.Address);
+                if (!candidate.Address.Equals(current))
+                    logger.LogInformation("Printer IP changed from {Previous} to {Current}", current, candidate.Address);
                 profile = profile with
                 {
+                    LastAdapter = adapter.Id,
                     Identity = profile.Identity with
                     {
                         LastAddress = candidate.Address.ToString()
@@ -203,7 +191,8 @@ public sealed class PrinterMonitorService(SettingsService storage, NetworkAdapte
     {
         if (!bridge.Running)
         {
-            bridge.Start(port, settings.MaxConnections, TimeSpan.FromSeconds(settings.IdleSeconds), (BridgeTarget target, CancellationToken ct) => ConnectConfirmedAsync(target, settings.ConnectSeconds, ct), (Exception ex) =>
+            bridge.Start(port, settings.MaxConnections, TimeSpan.FromSeconds(settings.IdleSeconds), (BridgeTarget target, CancellationToken ct) =>
+                ConnectConfirmedAsync(target, settings.ConnectSeconds, ct, Volatile.Read(ref printAdapters)), (Exception ex) =>
             {
                 logger.LogWarning(ex, "Bridge connection failed");
             });
@@ -211,23 +200,28 @@ public sealed class PrinterMonitorService(SettingsService storage, NetworkAdapte
         }
     }
 
-    public async Task ConfirmPrinterAsync(WifiAdapter adapter, NetworkPrinter printer, PrinterIdentity identity, int timeout, CancellationToken token)
+    public async Task ConfirmPrinterAsync(LanAdapter adapter, NetworkPrinter printer, PrinterIdentity identity, int timeout, CancellationToken token)
     {
         using (await ConnectConfirmedAsync(new BridgeTarget(adapter, printer, identity), timeout, token).ConfigureAwait(continueOnCapturedContext: false))
         {
         }
     }
 
-    private async Task<TcpClient> ConnectConfirmedAsync(BridgeTarget target, int timeout, CancellationToken token)
+    private async Task<TcpClient> ConnectConfirmedAsync(BridgeTarget target, int timeout, CancellationToken token,
+        IReadOnlyList<LanAdapter>? alternatives = null)
     {
         const int attempts = 6;
+        var address = target.Printer.Address;
+        var paths = (alternatives ?? []).Where(adapter => RoutingDiagnosticsService.IsCandidate(adapter, address))
+            .Prepend(target.Adapter).DistinctBy(adapter => (adapter.Id, adapter.Address)).ToArray();
         for (int attempt = 1; ; attempt++)
         {
+            var adapter = paths[(attempt - 1) % paths.Length];
             TcpClient? socket = null;
             try
             {
-                socket = await RoutingDiagnosticsService.ConnectAsync(target.Adapter, target.Printer.Address, 9100, TimeSpan.FromSeconds(timeout), token).ConfigureAwait(continueOnCapturedContext: false);
-                NetworkPrinter observed = await discovery.VerifyAddressAsync(target.Adapter, target.Printer.Address, target.Identity, token).ConfigureAwait(continueOnCapturedContext: false);
+                socket = await RoutingDiagnosticsService.ConnectAsync(adapter, address, 9100, TimeSpan.FromSeconds(timeout), token).ConfigureAwait(continueOnCapturedContext: false);
+                NetworkPrinter observed = await discovery.VerifyAddressAsync(adapter, address, target.Identity, token).ConfigureAwait(continueOnCapturedContext: false);
                 if (!identities.Matches(target.Identity, observed))
                 {
                     throw new InvalidOperationException(T("The printer answered on TCP/9100, but its identity could not be verified. Search again."));

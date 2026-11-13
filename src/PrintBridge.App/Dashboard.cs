@@ -173,7 +173,7 @@ internal sealed class Dashboard : Form
         headline.Margin = new Padding(3, 12, 3, 8);
         body.Controls.Add(headline);
         body.Controls.Add(actions);
-        string[] sections = new string[3] { T("Windows queue"), T("Physical printer"), "Wi-Fi" };
+        string[] sections = new string[3] { T("Windows queue"), T("Physical printer"), T("Local network") };
         for (int index = 0; index < sections.Length; index++)
         {
             Label label = new Label
@@ -344,8 +344,8 @@ internal sealed class Dashboard : Form
         NetworkPrinter? printer = state.Printer;
         PrinterIdentity? identity = Settings.Profile?.Identity;
         values[1].Text = ((printer == null && identity == null) ? T("No device selected") : $"{printer?.Model ?? identity?.Model ?? T("Unknown model")} · {printer?.Address.ToString() ?? identity?.LastAddress} · {printer?.Host ?? identity?.Host ?? T("unnamed")}\r\nMAC: {printer?.Mac ?? identity?.Mac ?? T("unavailable")} · {printer?.Source ?? T("saved profile")} · {T("last seen")}: {Monitor.LastSuccess?.ToString("g") ?? T("unavailable")}");
-        WifiAdapter? adapter = state.Adapter;
-        values[2].Text = ((adapter == null) ? T("No active Wi-Fi adapter verified") : $"{adapter} · {T("index")} {adapter.Index} · {T("metric")} {adapter.Metric} · {T("gateway")} {adapter.Gateway ?? T("none")}");
+        LanAdapter? adapter = state.Adapter;
+        values[2].Text = ((adapter == null) ? T("No active local network adapter verified") : $"{adapter} · {T("index")} {adapter.Index} · {T("metric")} {adapter.Metric} · {T("gateway")} {adapter.Gateway ?? T("none")}");
         string text2 = $"{(Bridge.Running ? T("Running") : T("Stopped"))} · 127.0.0.1:{plan?.LocalPort ?? Settings.LocalPort} → {Bridge.Target?.Printer.Address.ToString() ?? T("waiting")}:9100 · {T("connections")} {Bridge.Active}";
         string? error = Bridge.LastError;
         string bridgeStatus = text2 + ((error != null) ? ($"\r\n{T("Last connection error")}: " + error) : "");
@@ -462,7 +462,7 @@ internal sealed class Dashboard : Form
                     await install.ChangeQueueAsync("connect", plan);
                     Save(Settings with
                     {
-                        Profile = new Profile(plan, identity),
+                        Profile = new Profile(plan, identity, adapter.Id),
                         Adapter = wizard.AdapterOverride
                     });
                     storage.ClearPending();
@@ -560,7 +560,7 @@ internal sealed class Dashboard : Form
     {
         return RunAsync(async () =>
         {
-            IReadOnlyList<WifiAdapter> list = await Task.Run((Func<IReadOnlyList<WifiAdapter>>)adapters.GetAdapters, stop.Token);
+            IReadOnlyList<LanAdapter> list = await Task.Run((Func<IReadOnlyList<LanAdapter>>)adapters.GetAdapters, stop.Token);
             using PreferencesForm dialog = new(Settings, startup.Enabled, list, diagnostics.Clean,
                 owner => CheckUpdatesRequested?.Invoke(owner) ?? Task.CompletedTask);
             var result = dialog.ShowDialog(this);
@@ -650,14 +650,14 @@ internal sealed class Dashboard : Form
             ["Connections"] = Bridge.Active,
             ["PrinterAvailable"] = state.Available,
             ["LastSuccess"] = Monitor.LastSuccess,
-            ["WifiPresent"] = state.Adapter != null,
+            ["NetworkAdapterPresent"] = state.Adapter != null,
             ["QueuePresent"] = state.Queue != null
         };
         if (includeIdentifiers)
         {
             report["Status"] = state.Message;
             report["Route"] = state.Route;
-            report["Wifi"] = state.Adapter?.ToString();
+            report["NetworkAdapter"] = state.Adapter?.ToString();
             report["Queue"] = state.Queue;
             report["Printer"] = state.Printer?.ToString();
             report["Identity"] = Settings.Profile?.Identity;
