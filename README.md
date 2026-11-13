@@ -19,10 +19,10 @@ PrintBridge is a Windows utility that routes RAW printing to a network printer o
 
 ## Getting started
 
-1. Download the installer for your architecture. The installer includes the .NET runtime. EXE setup suggests a language based on Windows and uses your selection as the app's initial language. You can change it under **Settings → Language**.
-2. Turn on the printer, connect the PC to the same local network, and open PrintBridge. Use **Automatic** to search connected Wi-Fi and Ethernet adapters, or select an adapter manually. Select the Windows queue and verify the physical printer.
+1. Download the installer for your architecture. The installer includes the .NET runtime. Choose your preferred language in EXE setup or in PrintBridge under **Settings → Language**.
+2. Turn on the printer, connect the PC to the same local network, and open PrintBridge. Use **Automatic** to search connected Wi-Fi and Ethernet adapters, or select an adapter manually. Select the print queue and verify the physical printer.
 3. Choose **Create a separate queue** to keep the original queue available or **Switch the selected queue** to keep using its existing name. Approve the Windows request to change the queue or create its port.
-4. Print a test page and check the physical output. For normal printing, select the Windows queue you connected in the wizard.
+4. Print a test page and check the physical output. For normal printing, select the print queue you connected in the wizard.
 
 Closing the window sends PrintBridge to the tray. You can enable automatic startup under **Settings**. To remove the integration, choose **Restore original port**. The EXE uninstaller also offers to clean up the queue integration before removing the app. A per-user upgrade preserves the profile and any language saved in Settings.
 
@@ -38,7 +38,7 @@ PrintBridge checks shortly after launch and every 12 hours while running, and in
 | --- | --- |
 | The printer is missing from discovery | Check that it is on, reachable from the selected local network, and accepts RAW TCP on port 9100. |
 | The bridge cannot connect while a VPN is active | Use **Diagnostics** to compare the Windows route with the selected adapter's route. Check whether the VPN allows local LAN traffic. |
-| A job disappears without printing | Check **Last connection error** in the TCP bridge panel and the printer's own job log. A Windows queue status alone does not confirm delivery. |
+| A job disappears without printing | Check **Last connection error** under **Printer connection** and check the printer's own job log to confirm delivery. |
 | Restore or uninstall reports a conflict | Wait for pending jobs to finish and check whether another queue uses the bridge port. Keep the saved profile until restoration finishes. |
 
 The default monitor interval is five minutes while idle. A print job starts connecting immediately and the bridge retries if the printer is temporarily unavailable. The bridge listens on loopback. It does not change VPN policies or send diagnostics to an external service. The diagnostic export can omit network and queue identifiers.
