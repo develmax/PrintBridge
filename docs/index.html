@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="PrintBridge keeps Windows printing local over Wi-Fi or Ethernet and finds the same printer again when its IP address changes.">
+  <meta name="theme-color" content="#f4f7fb">
+  <title>PrintBridge — Keep your network printer connected</title>
+  <link rel="canonical" href="https://develmax.github.io/PrintBridge/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PrintBridge">
+  <meta property="og:url" content="https://develmax.github.io/PrintBridge/">
+  <meta property="og:title" content="PrintBridge — Keep your network printer connected">
+  <meta property="og:description" content="Print locally on Windows over Wi-Fi or Ethernet, even when a VPN changes the route or your printer gets a new IP address.">
+  <meta property="og:image" content="https://develmax.github.io/PrintBridge/assets/social-preview.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PrintBridge dashboard showing a network printer ready to print">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PrintBridge — Keep your network printer connected">
+  <meta name="twitter:description" content="Print locally on Windows over Wi-Fi or Ethernet, even when a VPN changes the route or your printer gets a new IP address.">
+  <meta name="twitter:image" content="https://develmax.github.io/PrintBridge/assets/social-preview.png">
+  <meta name="twitter:image:alt" content="PrintBridge dashboard showing a network printer ready to print">
+  <link rel="icon" href="assets/printbridge.png">
+  <link rel="stylesheet" href="style.css?v=6">
+  <script src="demo.js?v=7" defer></script>
+</head>
+<body>
+  <header class="shell topbar">
+    <a class="brand" href="#"><img src="assets/printbridge.png" alt="" width="32" height="32">PrintBridge</a>
+    <nav aria-label="Main navigation">
+      <a href="#demo">How it works</a>
+      <a href="https://github.com/develmax/PrintBridge/wiki">Docs</a>
+      <a class="nav-strong" href="https://github.com/develmax/PrintBridge">GitHub ↗</a>
+    </nav>
+  </header>
+  <main>
+    <section class="shell hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="signal"></span> Windows 10 &amp; 11</p>
+        <h1 id="hero-title">Keep your printer <em>connected.</em></h1>
+        <p class="intro">When a VPN changes your route or your router gives the printer a new IP, PrintBridge keeps your Windows print queue connected over Wi-Fi or Ethernet.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="https://github.com/develmax/PrintBridge/releases/latest">Download for Windows <span aria-hidden="true">↓</span></a>
+          <a class="button secondary" href="#demo">See how it works <span aria-hidden="true">↘</span></a>
+        </div>
+        <p class="fine">Free to use · x64 and ARM64 · EXE, ZIP and MSI</p>
+      </div>
+      <div class="hero-art">
+        <div class="art-top"><span><i></i> PRINTBRIDGE</span><button class="print-replay" type="button" hidden>Replay print <span aria-hidden="true">↻</span></button></div>
+        <div class="printer" aria-hidden="true">
+          <div class="sheet-input"></div>
+          <div class="printer-top"></div>
+          <div class="printer-body"><span class="printer-led"></span><div class="tray"></div><div class="output-slot"><div class="sheet-output"><i></i><i></i><i></i></div></div></div>
+        </div>
+        <div class="art-bottom"><span>PRINT QUEUE</span><span class="art-line"></span><span>PRINTER</span></div>
+      </div>
+    </section>
+    <section class="demo-section" id="demo" aria-labelledby="demo-title">
+      <div class="shell">
+        <div class="section-head">
+          <h2 id="demo-title">When printing stops</h2>
+          <p>Watch what happens to a print job in two common network scenarios.</p>
+        </div>
+        <div class="demos">
+          <article class="demo" data-demo>
+            <div class="demo-head"><span class="demo-icon" aria-hidden="true">↱</span><h3>VPN changes the route</h3></div>
+            <div class="scene" aria-hidden="true">
+              <div class="phase problem"><span></span> WINDOWS ROUTE</div>
+              <div class="phase solution"><span></span> PRINTBRIDGE ROUTE</div>
+              <div class="route">
+                <div class="node">Print job</div>
+                <div class="track"><i></i></div>
+                <div class="node middle"><span class="problem">VPN</span><span class="solution">Wi-Fi / LAN</span></div>
+                <div class="track last"><i></i></div>
+                <div class="node destination">Printer<br><small class="problem">Unreachable</small><small class="solution">Connected</small></div>
+              </div>
+              <div class="outcome"><span class="blocked">× Printing unavailable</span><span class="sending">Sending print job…</span><span class="ready">✓ Ready to print</span></div>
+            </div>
+            <div class="demo-foot"><p>PrintBridge connects through the local adapter when your VPN allows LAN access.</p><button class="play" type="button"><span aria-hidden="true">▶</span> Play</button></div>
+            <p class="sr-only" role="status"></p>
+          </article>
+          <article class="demo" data-demo>
+            <div class="demo-head"><span class="demo-icon" aria-hidden="true">↻</span><h3>Printer gets a new IP</h3></div>
+            <div class="scene" aria-hidden="true">
+              <div class="phase problem"><span></span> OLD ADDRESS</div>
+              <div class="phase solution"><span></span> ADDRESS UPDATED</div>
+              <div class="route">
+                <div class="node">Queue<br><small>Print job</small></div>
+                <div class="track"><i></i></div>
+                <div class="node middle ip"><span class="problem">192.0.2.10</span><span class="solution">192.0.2.24</span></div>
+                <div class="track last"><i></i></div>
+                <div class="node destination">Printer<br><small class="problem">Moved</small><small class="solution">Verified</small></div>
+              </div>
+              <div class="outcome"><span class="blocked">× Printing unavailable</span><span class="sending">Sending print job…</span><span class="ready">✓ Ready to print</span></div>
+            </div>
+            <div class="demo-foot"><p>PrintBridge checks the printer’s identity before sending jobs to its new address.</p><button class="play" type="button"><span aria-hidden="true">▶</span> Play</button></div>
+            <p class="sr-only" role="status"></p>
+          </article>
+        </div>
+      </div>
+    </section>
+    <section class="shell setup" aria-labelledby="setup-title">
+      <figure class="app-preview"><img src="assets/dashboard-wpf.png?v=1.3.1" width="1140" height="990" loading="lazy" alt="The PrintBridge dashboard showing the printer status, print queue, and local network"><figcaption>PrintBridge dashboard with example data</figcaption></figure>
+      <div class="setup-copy">
+        <h2 id="setup-title">Connect your print queue</h2>
+        <ol>
+          <li><strong>Find your printer.</strong> Search your local network automatically or choose an adapter.</li>
+          <li><strong>Connect a queue.</strong> Use the installed Windows driver. Create a separate queue or switch the existing one.</li>
+          <li><strong>Print a test page.</strong> After that, send documents to the same queue from your Windows apps.</li>
+        </ol>
+        <p class="languages"><strong>Available in 16 languages.</strong> Choose your language in EXE setup or under Settings → General → Language. <a href="https://github.com/develmax/PrintBridge/releases/tag/v1.3.1">See what’s new in 1.3.1 ↗</a></p>
+        <p class="requirements">Requires an IPv4 local network and a printer and driver that support RAW TCP/9100.</p>
+        <a class="text-link" href="https://github.com/develmax/PrintBridge/wiki/Getting-started">Read the setup guide ↗</a>
+      </div>
+    </section>
+    <section class="download" id="download">
+      <div class="shell download-inner">
+        <div><h2>Download PrintBridge</h2><p>Choose EXE, ZIP, or MSI for Windows x64 or ARM64.</p></div>
+        <a class="button primary" href="https://github.com/develmax/PrintBridge/releases/latest">Get the latest release <span aria-hidden="true">↓</span></a>
+      </div>
+    </section>
+  </main>
+  <footer class="shell footer">
+    <a class="brand" href="#"><img src="assets/printbridge.png" alt="" width="26" height="26">PrintBridge</a>
+    <div><a href="https://github.com/develmax">develmax</a><a href="https://github.com/develmax/PrintBridge/issues">Report an issue</a><a href="https://github.com/develmax/PrintBridge#support-development">Support</a></div>
+  </footer>
+</body>
+</html>
