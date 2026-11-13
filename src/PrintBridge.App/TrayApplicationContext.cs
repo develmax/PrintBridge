@@ -47,6 +47,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private int networkChanged;
 
     private bool closing;
+    private bool quietStartup;
 
     private string? previousStatus;
 
@@ -58,6 +59,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     public TrayApplicationContext(IServiceProvider services, bool trayLaunch, bool afterUpdate)
     {
+        quietStartup = trayLaunch;
         logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge");
         windows = services.GetRequiredService<WindowsPrinterService>();
         dashboard = ActivatorUtilities.CreateInstance<Dashboard>(services, Array.Empty<object>());
@@ -216,6 +218,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
             {
                 nextCheck = DateTimeOffset.UtcNow.AddSeconds(dashboard.Settings.IntervalSeconds);
                 await dashboard.CheckAsync(networkEvent, background: true);
+                if (quietStartup && !closing)
+                {
+                    previousStatus = dashboard.Monitor.State.Message;
+                    quietStartup = false;
+                }
             }
         }
     }
@@ -381,7 +388,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         if (!state.Searching && state.Message != previousStatus)
         {
-            if (previousStatus != null && dashboard.Settings.Notify && dashboard.Settings.Profile != null && !dashboard.Visible)
+            if (!quietStartup && previousStatus != null && dashboard.Settings.Notify && dashboard.Settings.Profile != null && !dashboard.Visible)
             {
                 tray.ShowBalloonTip(2500, "PrintBridge", state.Message, ToolTipIcon.Info);
             }

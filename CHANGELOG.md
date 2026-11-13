@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3
+
+- Suppressed initial printer status notifications when starting with Windows or restarting after an update.
+
 ## 1.2.2
 
 - Added **Check for updates now** in Settings. PrintBridge announces queued updates and asks for approval when automatic updates are disabled.
