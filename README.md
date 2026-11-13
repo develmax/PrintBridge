@@ -57,6 +57,12 @@ To build all release formats, install the WiX 6.0.2 .NET tool and run `./scripts
 
 See the [contribution guide](CONTRIBUTING.md), [roadmap](ROADMAP.md), [acceptance checklist](docs/acceptance.md), and [changelog](CHANGELOG.md). See [release signature verification](docs/release-signing.md) for signed packages and maintainer instructions.
 
+## Support development
+
+If PrintBridge helps you keep printing, you can support its maintenance, testing, and documentation. Donations are optional.
+
+[Patreon](https://www.patreon.com/develmax) · [Boosty](https://boosty.to/develmax/donate) · [YooMoney](https://yoomoney.ru/to/4100119529133322) · [PayPal](https://paypal.me/develmax)
+
 ## Author and license
 
 Created by [develmax](https://github.com/develmax). The [PrintBridge Source License](LICENSE) permits free use, including business use, and allows modification and free redistribution with attribution. Selling copies requires separate written permission. See [third-party notices](THIRD-PARTY-NOTICES.md) for bundled components.
