@@ -1,5 +1,9 @@
 # PrintBridge
 
+[![Build and tests](https://github.com/develmax/PrintBridge/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/develmax/PrintBridge/actions/workflows/build.yml)
+[![CodeQL](https://github.com/develmax/PrintBridge/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/develmax/PrintBridge/actions/workflows/codeql.yml)
+[![Latest release](https://img.shields.io/github/v/release/develmax/PrintBridge?label=release)](https://github.com/develmax/PrintBridge/releases/latest)
+
 PrintBridge is a Windows utility that routes RAW printing to a network printer over your local Wi-Fi. It helps when a VPN changes Windows routing or a printer receives a new IP address. It runs in the system tray and uses your installed Windows printer driver.
 
 [Download the latest release](https://github.com/develmax/PrintBridge/releases/latest) · [Report an issue](https://github.com/develmax/PrintBridge/issues)
@@ -23,7 +27,7 @@ Closing the window sends PrintBridge to the tray. You can enable automatic start
 
 Releases include a direct EXE download, a ZIP containing the same EXE, and an MSI for Windows Installer deployments. Use the same installer type for upgrades. To switch between EXE and MSI, restore the original port, uninstall PrintBridge, and then install the other package. Restore the original port before uninstalling the MSI.
 
-Enable **Settings → Automatically check for and install updates** to install newer stable GitHub releases in the background. PrintBridge checks shortly after launch and every 12 hours while running. It verifies the package against GitHub's SHA-256 digest, defers installation while printing or configuration is in progress, and returns to the tray after setup. The setting is off until enabled.
+PrintBridge checks shortly after launch and every 12 hours while running, and installs newer stable GitHub releases in the background. It verifies the package against GitHub's SHA-256 digest, defers installation while printing or configuration is in progress, and returns to the tray after setup. Automatic updates are enabled by default. To turn them off, clear **Automatically check for and install updates** in **Settings**.
 
 ## Troubleshooting
 
@@ -35,6 +39,8 @@ Enable **Settings → Automatically check for and install updates** to install n
 | Restore or uninstall reports a conflict | Wait for pending jobs to finish and check whether another queue uses the bridge port. Keep the saved profile until restoration finishes. |
 
 The default monitor interval is 60 seconds. When the printer is temporarily unavailable, the bridge retries the connection before forwarding job data. The bridge listens on loopback. It does not change VPN policies or send diagnostics to an external service. The diagnostic export can omit network and queue identifiers.
+
+Use **Report a bug** to preview, copy, or save a report with network and queue identifiers removed. **Open GitHub draft** fills in the app version and prompts for reproduction steps. You can paste the report into the public issue and submit it from GitHub.
 
 ## Build and contribute
 

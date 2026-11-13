@@ -9,7 +9,3 @@ Manage several printers from one PrintBridge instance. Each printer would have i
 ## Remote printing
 
 Allow authorized users to submit jobs to a printer on another network. The design should use authenticated, encrypted transport, give owners control over who can print, and keep the printer's RAW port on the local network.
-
-## In-app error reporting
-
-Let users review and submit an error report from PrintBridge. Start with a redacted diagnostic report, show exactly what will be sent, and require confirmation before sending.

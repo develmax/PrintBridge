@@ -177,6 +177,7 @@ internal sealed class Dashboard : Form
         restore = Add(T("Restore original port"), RestoreAsync);
         Add(T("Settings"), SettingsAsync);
         Add(T("Diagnostics"), ExportAsync);
+        Add(T("Report a bug"), ReportBugAsync);
         Add(T("Open logs"), () =>
         {
             OpenLogs();
@@ -526,32 +527,44 @@ internal sealed class Dashboard : Form
             };
             if (save.ShowDialog(this) == DialogResult.OK)
             {
-                MonitorState state = Monitor.State;
-                Dictionary<string, object?> report = new Dictionary<string, object?>
-                {
-                    ["Version"] = typeof(Dashboard).Assembly.GetName().Version?.ToString(),
-                    ["Time"] = DateTimeOffset.Now,
-                    ["OS"] = Environment.OSVersion.ToString(),
-                    ["BridgeRunning"] = Bridge.Running,
-                    ["Connections"] = Bridge.Active,
-                    ["PrinterAvailable"] = state.Available,
-                    ["LastSuccess"] = Monitor.LastSuccess,
-                    ["WifiPresent"] = state.Adapter != null,
-                    ["QueuePresent"] = state.Queue != null
-                };
-                if (response == DialogResult.No)
-                {
-                    report["Status"] = state.Message;
-                    report["Route"] = state.Route;
-                    report["Wifi"] = state.Adapter?.ToString();
-                    report["Queue"] = state.Queue;
-                    report["Printer"] = state.Printer?.ToString();
-                    report["Identity"] = Settings.Profile?.Identity;
-                    report["BridgeError"] = Bridge.LastError;
-                }
-                await DiagnosticsService.ExportAsync(save.FileName, report);
+                await DiagnosticsService.ExportAsync(save.FileName, CreateReport(includeIdentifiers: response == DialogResult.No));
             }
         });
+    }
+
+    private Task ReportBugAsync() => RunAsync(() =>
+    {
+        using var dialog = new BugReportForm(DiagnosticsService.FormatReport(CreateReport(includeIdentifiers: false)));
+        dialog.ShowDialog(this);
+        return Task.CompletedTask;
+    });
+
+    private Dictionary<string, object?> CreateReport(bool includeIdentifiers)
+    {
+        MonitorState state = Monitor.State;
+        var report = new Dictionary<string, object?>
+        {
+            ["Version"] = typeof(Dashboard).Assembly.GetName().Version?.ToString(),
+            ["Time"] = DateTimeOffset.Now,
+            ["OS"] = Environment.OSVersion.ToString(),
+            ["BridgeRunning"] = Bridge.Running,
+            ["Connections"] = Bridge.Active,
+            ["PrinterAvailable"] = state.Available,
+            ["LastSuccess"] = Monitor.LastSuccess,
+            ["WifiPresent"] = state.Adapter != null,
+            ["QueuePresent"] = state.Queue != null
+        };
+        if (includeIdentifiers)
+        {
+            report["Status"] = state.Message;
+            report["Route"] = state.Route;
+            report["Wifi"] = state.Adapter?.ToString();
+            report["Queue"] = state.Queue;
+            report["Printer"] = state.Printer?.ToString();
+            report["Identity"] = Settings.Profile?.Identity;
+            report["BridgeError"] = Bridge.LastError;
+        }
+        return report;
     }
 
     public async Task ShutdownAsync()

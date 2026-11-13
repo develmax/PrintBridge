@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Added **Report a bug**, with a redacted diagnostic preview, copy and save actions, and a prefilled GitHub issue draft.
+- Enabled automatic updates by default for profiles without a saved update preference.
+
 ## 1.2.0
 
 - Added optional automatic updates from stable GitHub releases. PrintBridge verifies the installer digest, waits for an idle queue and bridge, and restarts after the update.

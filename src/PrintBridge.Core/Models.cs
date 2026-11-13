@@ -193,4 +193,4 @@ public sealed record PrintPlan(Guid Id, string SourceQueue, string Queue, string
 
 public sealed record Profile(PrintPlan Print, PrinterIdentity Identity);
 
-public sealed record AppSettings(bool StartHidden = true, bool Notify = true, bool AutoDiscover = true, int IntervalSeconds = 60, Guid? Adapter = null, int LocalPort = 19100, int ConnectSeconds = 4, int IdleSeconds = 120, int MaxConnections = 4, bool Verbose = false, Profile? Profile = null, string? Language = null, bool AutoUpdate = false);
+public sealed record AppSettings(bool StartHidden = true, bool Notify = true, bool AutoDiscover = true, int IntervalSeconds = 60, Guid? Adapter = null, int LocalPort = 19100, int ConnectSeconds = 4, int IdleSeconds = 120, int MaxConnections = 4, bool Verbose = false, Profile? Profile = null, string? Language = null, bool AutoUpdate = true);

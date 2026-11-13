@@ -25,8 +25,11 @@ public sealed class DiagnosticsService : ILoggerProvider
         }
     }
 
-    public static async Task ExportAsync(string destination, object report) =>
-        await File.WriteAllTextAsync(destination, JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true })).ConfigureAwait(false);
+    public static string FormatReport(object report) =>
+        JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
+
+    public static Task ExportAsync(string destination, object report) =>
+        File.WriteAllTextAsync(destination, FormatReport(report));
 
     private void Write<T>(string category, LogLevel level, EventId id, T state, Exception? error, Func<T, Exception?, string> format)
     {

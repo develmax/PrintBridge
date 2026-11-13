@@ -4,6 +4,14 @@ public sealed class UpdateTests
 {
     private static readonly Version Current = new(1, 2, 0);
 
+    [Fact]
+    public void UpdatesDefaultToEnabledAndRespectSavedOptOut()
+    {
+        Assert.True(new AppSettings().AutoUpdate);
+        Assert.True(System.Text.Json.JsonSerializer.Deserialize<AppSettings>("{}")!.AutoUpdate);
+        Assert.False(System.Text.Json.JsonSerializer.Deserialize<AppSettings>("{\"AutoUpdate\":false}")!.AutoUpdate);
+    }
+
     [Theory]
     [InlineData("win-x64", false, "exe")]
     [InlineData("win-arm64", true, "msi")]
