@@ -34,7 +34,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly EventWaitHandle updateStopEvent = new(false, EventResetMode.AutoReset, Program.SessionName + ".StopForUpdate");
     private readonly CancellationTokenSource lifetime = new();
     private readonly WindowsPrinterService windows;
-    private readonly GitHubUpdateService updates = new();
+    private readonly GitHubUpdateService updates;
     private readonly bool msi = File.Exists(Path.Combine(AppContext.BaseDirectory, "msi-installation.txt"));
     private DateTimeOffset nextUpdate = DateTimeOffset.UtcNow.AddMinutes(1);
     private bool checkingUpdate;
@@ -61,6 +61,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         quietStartup = trayLaunch;
         logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge");
+        updates = new GitHubUpdateService(logger);
         windows = services.GetRequiredService<WindowsPrinterService>();
         dashboard = ActivatorUtilities.CreateInstance<Dashboard>(services, Array.Empty<object>());
         dashboard.CheckUpdatesRequested += CheckForUpdateAsync;
@@ -255,6 +256,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             return;
         }
         checkingUpdate = true;
+        string stage = "check";
         try
         {
             if (owner != null || queuedUpdate == null)
@@ -289,11 +291,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
             if (!(dashboard.Settings.AutoUpdate || updateApproved))
                 return;
             nextUpdate = DateTimeOffset.UtcNow.AddMinutes(5);
+            stage = "wait for idle before download";
             if (!await CanUpdateAsync())
+            {
+                logger.LogInformation("Update: deferred before download while PrintBridge or the print queue is busy");
                 return;
+            }
 
+            stage = "download";
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
-            deadline.CancelAfter(TimeSpan.FromMinutes(3));
+            deadline.CancelAfter(TimeSpan.FromMinutes(15));
             string? package = await updates.DownloadAsync(current, msi, deadline.Token, queuedUpdate);
             if (package == null)
             {
@@ -301,16 +308,24 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 updateApproved = false;
                 return;
             }
+            stage = "wait for idle before installation";
             if (await CanUpdateAsync())
             {
+                stage = "update worker";
                 using var worker = StartUpdateWorker(package);
+                logger.LogInformation("Update: started worker for {Package} with process ID {ProcessId}", Path.GetFileName(package), worker.Id);
                 await worker.WaitForExitAsync(lifetime.Token);
+                logger.LogInformation("Update: worker finished with exit code {ExitCode}", worker.ExitCode);
+            }
+            else
+            {
+                logger.LogInformation("Update: downloaded package will wait until PrintBridge and the print queue are idle");
             }
         }
         catch (OperationCanceledException) when (closing) { }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Update did not start");
+            logger.LogWarning(ex, "Update failed at stage {Stage}", stage);
             if (owner != null && !closing && owner.Handle != IntPtr.Zero)
                 ShowUpdateMessage(owner, T("Could not check for updates. Try again later."), MessageBoxIcon.Warning);
         }

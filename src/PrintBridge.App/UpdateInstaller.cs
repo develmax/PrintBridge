@@ -5,8 +5,9 @@ namespace PrintBridge;
 
 internal static class UpdateInstaller
 {
-    public static async Task InstallAsync(string package, bool msi, ILogger logger)
+    public static async Task<int> InstallAsync(string package, bool msi, ILogger logger)
     {
+        logger.LogInformation("Update: worker verifying {Package}", Path.GetFileName(package));
         await using var verified = await GitHubUpdateService.OpenVerifiedPackageAsync(
             package, Version.Parse(Program.Version), msi, CancellationToken.None).ConfigureAwait(false);
         string log = Path.Combine(Path.GetDirectoryName(package)!, "installation.log");
@@ -26,6 +27,9 @@ internal static class UpdateInstaller
         logger.LogInformation("Started automatic update from {Package}", Path.GetFileName(package));
         await process.WaitForExitAsync().ConfigureAwait(false);
         if (process.ExitCode != 0)
-            logger.LogWarning("Automatic update installer exited with code {Code}", process.ExitCode);
+            logger.LogWarning("Automatic update installer exited with code {Code}. Installer log: {InstallerLog}", process.ExitCode, log);
+        else
+            logger.LogInformation("Update: installer completed successfully. Installer log: {InstallerLog}", log);
+        return process.ExitCode;
     }
 }
