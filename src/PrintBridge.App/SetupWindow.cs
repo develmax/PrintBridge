@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Extensions.Logging;
 using Button = System.Windows.Controls.Button;
 using CheckBox = System.Windows.Controls.CheckBox;
 using ComboBox = System.Windows.Controls.ComboBox;
@@ -37,6 +38,8 @@ internal sealed class SetupWindow : AppDialog
     private readonly PrinterIdentityService identity;
 
     private readonly AppSettings settings;
+    private readonly ILogger logger;
+    private (string Reason, PrinterQueue? Queue, DeviceChoice? Device, bool Separate, bool Confirmed)? lastValidation;
 
     private readonly CancellationTokenSource cancellation;
 
@@ -57,7 +60,7 @@ internal sealed class SetupWindow : AppDialog
     public Guid? AdapterOverride { get; private set; }
 
     public SetupWindow(NetworkAdapterService adapters, WindowsPrinterService windows, PrinterDiscoveryService discovery,
-        PrinterIdentityService identity, AppSettings settings, CancellationToken parent)
+        PrinterIdentityService identity, AppSettings settings, CancellationToken parent, ILogger logger)
         : base(F("PrintBridge Setup {0}", Program.Version), T("Connect a printer"), 715, 610)
     {
         this.adapters = adapters;
@@ -65,6 +68,7 @@ internal sealed class SetupWindow : AppDialog
         this.discovery = discovery;
         this.identity = identity;
         this.settings = settings;
+        this.logger = logger;
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(parent);
         parentRegistration = parent.Register(() => Dispatcher.InvokeAsync(() =>
         {
@@ -154,24 +158,60 @@ internal sealed class SetupWindow : AppDialog
 
     private void ValidateSelection()
     {
-        bool canConnect = false;
-        if (devices.SelectedItem is DeviceChoice { Printer: var device })
+        if (busy)
+            return;
+
+        var queue = queues.SelectedItem as PrinterQueue;
+        var choice = devices.SelectedItem as DeviceChoice;
+        var device = choice?.Printer;
+        bool createSeparate = separate.IsChecked == true;
+        bool confirmed = compatible.IsChecked == true;
+        bool? trackable = device == null ? null : PrinterIdentity.Confirm(device).IsTrackable;
+        string reason;
+        if (device == null)
         {
-            if (!device.Raw)
-            {
-                status.Text = F("TCP/9100 is unavailable. Other protocols detected: IPP {0}, LPR {1}. {2}.", YesNo(device.Ipp), YesNo(device.Lpr), device.Source);
-            }
-            else if (!PrinterIdentity.Confirm(device).IsTrackable)
-            {
-                status.Text = T("The device did not provide a MAC address, UUID, or serial number. Automatic tracking is unavailable.");
-            }
-            else if (queues.SelectedItem is PrinterQueue queue)
-            {
-                canConnect = WindowsPrinterIntegrationService.Eligible(queue) && (separate.IsChecked == true || !queue.Shared);
-                status.Text = (canConnect ? T("Verify the printer's model, address, identifier, and driver compatibility.") : T("RAW printing is unavailable for the selected queue or mode."));
-            }
+            reason = "PrinterNotSelected";
         }
-        connect.IsEnabled = !busy && canConnect && compatible.IsChecked == true;
+        else if (!device.Raw)
+        {
+            reason = "Tcp9100Unavailable";
+            status.Text = F("TCP/9100 is unavailable. Other protocols detected: IPP {0}, LPR {1}. {2}.", YesNo(device.Ipp), YesNo(device.Lpr), device.Source);
+        }
+        else if (trackable == false)
+        {
+            reason = "PrinterIdentityMissing";
+            status.Text = T("The device did not provide a MAC address, UUID, or serial number. Automatic tracking is unavailable.");
+        }
+        else if (queue == null)
+        {
+            reason = "QueueNotSelected";
+        }
+        else if (!WindowsPrinterIntegrationService.Eligible(queue))
+        {
+            reason = "QueueIneligible";
+            status.Text = T("RAW printing is unavailable for the selected queue or mode.");
+        }
+        else if (!createSeparate && queue.Shared)
+        {
+            reason = "SharedQueueCannotBeSwitched";
+            status.Text = T("RAW printing is unavailable for the selected queue or mode.");
+        }
+        else
+        {
+            reason = confirmed ? "Ready" : "CompatibilityNotConfirmed";
+            status.Text = T("Verify the printer's model, address, identifier, and driver compatibility.");
+        }
+        connect.IsEnabled = reason == "Ready";
+
+        var validation = (reason, queue, choice, createSeparate, confirmed);
+        if (lastValidation == validation)
+            return;
+
+        lastValidation = validation;
+        logger.LogInformation(
+            "Printer setup validation: {SetupReason}; Connect enabled: {ConnectEnabled}; queue: {Queue}; driver: {Driver}; port: {QueuePort}; queue RAW: {QueueRaw}; shared: {QueueShared}; printer: {PrinterModel}; address: {PrinterAddress}; adapter: {Adapter}; detected RAW: {PrinterRaw}; identity verified: {PrinterTrackable}; separate queue: {SeparateQueue}; confirmed: {CompatibilityConfirmed}",
+            reason, connect.IsEnabled, queue?.Name, queue?.Driver, queue?.Port, queue?.RawPort, queue?.Shared,
+            device?.Model, device?.Address.ToString(), choice?.Adapter.Name, device?.Raw, trackable, createSeparate, confirmed);
     }
 
     private static string YesNo(bool value)
@@ -190,6 +230,7 @@ internal sealed class SetupWindow : AppDialog
             return;
         }
         busy = true;
+        lastValidation = null;
         find.IsEnabled = wifi.IsEnabled = queues.IsEnabled = devices.IsEnabled = connect.IsEnabled = false;
         progress.Visibility = Visibility.Visible;
         progress.IsIndeterminate = true;
@@ -214,6 +255,8 @@ internal sealed class SetupWindow : AppDialog
                 queues.Items.Add(queue);
             queues.SelectedItem = available.FirstOrDefault((PrinterQueue q) => q.Name == previous) ?? ((available.Length == 1) ? available[0] : null);
             var selected = LanAdapter.OrderForPrinter(interfaces, selectedAdapter, settings.Profile?.LastAdapter, null);
+            logger.LogInformation("Printer setup discovery: {QueueCount} available Windows queues, {AdapterCount} adapters to search",
+                available.Length, selected.Length);
             if (selected.Length == 0)
             {
                 status.Text = T("Connect to the selected local network and try again.");
@@ -231,6 +274,7 @@ internal sealed class SetupWindow : AppDialog
             foreach (var path in paths)
                 devices.Items.Add(path);
             var found = paths.Select(path => path.Printer).ToArray();
+            logger.LogInformation("Printer setup discovery found {PrinterCount} candidates", found.Length);
             if (queues.SelectedIndex == -1)
             {
                 PrinterQueue[] matching = available.Where((PrinterQueue q) => identity.Suggest(q, found) != null).Take(2).ToArray();
@@ -248,9 +292,10 @@ internal sealed class SetupWindow : AppDialog
         catch (OperationCanceledException)
         {
         }
-        catch (Exception ex2)
+        catch (Exception error)
         {
-            status.Text = ex2.Message;
+            logger.LogWarning(error, "Printer setup discovery failed");
+            status.Text = error.Message;
         }
         finally
         {
