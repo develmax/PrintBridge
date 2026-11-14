@@ -56,7 +56,7 @@ internal static class Program
                 bool msi = Path.GetExtension(args[1]) == ".msi";
                 try
                 {
-                    UpdateInstaller.InstallAsync(args[1], msi,
+                    return UpdateInstaller.InstallAsync(args[1], msi,
                         provider.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge")).GetAwaiter().GetResult();
                 }
                 finally
@@ -66,7 +66,6 @@ internal static class Program
                     else if (File.Exists(args[2]))
                         Process.Start(new ProcessStartInfo(args[2], "--after-update") { UseShellExecute = false });
                 }
-                return 0;
             }
             if (args.FirstOrDefault() == "--msi-stop")
             {
