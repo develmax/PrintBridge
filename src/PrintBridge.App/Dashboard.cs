@@ -310,7 +310,8 @@ internal sealed class Dashboard : Form
             {
                 throw new InvalidOperationException(T("Restore the queue from the incomplete setup first."));
             }
-            var wizard = new SetupWindow(adapters, windows, discovery, identities, Settings, stop.Token);
+            var wizard = new SetupWindow(adapters, windows, discovery, identities, Settings, stop.Token,
+                diagnostics.CreateLogger(typeof(SetupWindow).FullName!));
             if (wizard.ShowOwned(Handle) == true)
             {
                 SetupSelection? selection = wizard.Selection;
