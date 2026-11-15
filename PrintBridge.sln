@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrintBridge.IntegrationTest
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrintBridge.Tests", "tests\PrintBridge.Tests\PrintBridge.Tests.csproj", "{BFF3F56B-F424-4BE2-BDD2-582CD922BAA2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PrintBridge.Cli", "src\PrintBridge.Cli\PrintBridge.Cli.csproj", "{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -87,11 +89,24 @@ Global
 		{BFF3F56B-F424-4BE2-BDD2-582CD922BAA2}.Release|x64.Build.0 = Release|Any CPU
 		{BFF3F56B-F424-4BE2-BDD2-582CD922BAA2}.Release|x86.ActiveCfg = Release|Any CPU
 		{BFF3F56B-F424-4BE2-BDD2-582CD922BAA2}.Release|x86.Build.0 = Release|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Debug|x64.Build.0 = Debug|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Debug|x86.Build.0 = Debug|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Release|x64.ActiveCfg = Release|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Release|x64.Build.0 = Release|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Release|x86.ActiveCfg = Release|Any CPU
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{0E24F13B-A852-444A-BB78-1D1EBBB8AC36} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{31EBACDF-CCE0-4ED5-AFFE-15FFA8A99531} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{15919CFA-B415-458D-AB54-9B25646465A8} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{A222181B-AB4D-469C-A485-9BD1F4F25AE4} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}

@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace PrintBridge;
 
-public sealed record MonitorState(string Message, bool Searching = false, bool Available = false, LanAdapter? Adapter = null, NetworkPrinter? Printer = null, PrinterQueue? Queue = null, string? Route = null);
+public sealed record MonitorState(string Message, bool Searching = false, bool Available = false, LanAdapter? Adapter = null, NetworkPrinter? Printer = null, PrinterQueue? Queue = null, string? Route = null, bool RetryConnection = false);
 
 public sealed class PrinterMonitorService(SettingsService storage, NetworkAdapterService network, PrinterDiscoveryService discovery, PrinterIdentityService identities, WindowsPrinterService windows, RoutingDiagnosticsService routing, TcpBridgeService bridge, ILogger<PrinterMonitorService> logger)
 {
@@ -88,7 +88,7 @@ public sealed class PrinterMonitorService(SettingsService storage, NetworkAdapte
             if (adapter == null)
             {
                 bridge.SetTarget(null);
-                Update(new MonitorState(T("Waiting for the selected local network connection."), Queue: queue));
+                Update(new MonitorState(T("Waiting for the selected local network connection."), Queue: queue, RetryConnection: true));
                 previouslyAvailable = false;
                 return;
             }
@@ -150,7 +150,7 @@ public sealed class PrinterMonitorService(SettingsService storage, NetworkAdapte
                     logger.LogWarning("The printer stopped responding with its confirmed identity.");
                 }
                 previouslyAvailable = false;
-                Update(new MonitorState(T("The confirmed printer is unavailable. A VPN or firewall may be blocking local TCP."), Searching: false, Available: false, adapter, null, queue, route));
+                Update(new MonitorState(T("The confirmed printer is unavailable. A VPN or firewall may be blocking local TCP."), Searching: false, Available: false, adapter, null, queue, route, RetryConnection: true));
                 return;
             }
             if (!candidate.Address.Equals(current) || profile.LastAdapter != adapter.Id)

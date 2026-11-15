@@ -8,7 +8,6 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Extensions.Logging;
 using Button = System.Windows.Controls.Button;
-using CheckBox = System.Windows.Controls.CheckBox;
 using ComboBox = System.Windows.Controls.ComboBox;
 using RadioButton = System.Windows.Controls.RadioButton;
 using ProgressBar = System.Windows.Controls.ProgressBar;
@@ -39,7 +38,7 @@ internal sealed class SetupWindow : AppDialog
 
     private readonly AppSettings settings;
     private readonly ILogger logger;
-    private (string Reason, PrinterQueue? Queue, DeviceChoice? Device, bool Separate, bool Confirmed)? lastValidation;
+    private (string Reason, PrinterQueue? Queue, DeviceChoice? Device, bool Separate)? lastValidation;
 
     private readonly CancellationTokenSource cancellation;
 
@@ -47,7 +46,6 @@ internal sealed class SetupWindow : AppDialog
     private readonly ComboBox queues = new() { MinHeight = 30 };
     private readonly ComboBox devices = new() { MinHeight = 30 };
     private readonly RadioButton separate = new() { IsChecked = true };
-    private readonly CheckBox compatible = new();
     private readonly TextBlock status = new() { TextWrapping = TextWrapping.Wrap };
     private readonly ProgressBar progress = new() { Height = 4, Visibility = Visibility.Hidden };
     private readonly Button find;
@@ -83,7 +81,6 @@ internal sealed class SetupWindow : AppDialog
         var existing = new RadioButton();
         AddOption(separate, T("Create a separate queue (recommended)"));
         AddOption(existing, T("Switch the selected queue and save its original port"));
-        AddOption(compatible, T("I verified the printer and its driver's RAW TCP/9100 support."));
         status.Margin = new Thickness(0, 10, 0, 8);
         Body.Children.Add(status);
         Body.Children.Add(progress);
@@ -104,13 +101,10 @@ internal sealed class SetupWindow : AppDialog
         queues.SelectionChanged += (_, _) => Suggest();
         devices.SelectionChanged += (_, _) =>
         {
-            compatible.IsChecked = false;
             ValidateSelection();
         };
         separate.Checked += (_, _) => ValidateSelection();
         separate.Unchecked += (_, _) => ValidateSelection();
-        compatible.Checked += (_, _) => ValidateSelection();
-        compatible.Unchecked += (_, _) => ValidateSelection();
         find.Click += async (_, _) => await FindAsync();
         connect.Click += (_, _) =>
         {
@@ -143,7 +137,6 @@ internal sealed class SetupWindow : AppDialog
 
     private void Suggest()
     {
-        compatible.IsChecked = false;
         if (queues.SelectedItem is PrinterQueue queue)
         {
             var choices = devices.Items.Cast<DeviceChoice>();
@@ -165,7 +158,6 @@ internal sealed class SetupWindow : AppDialog
         var choice = devices.SelectedItem as DeviceChoice;
         var device = choice?.Printer;
         bool createSeparate = separate.IsChecked == true;
-        bool confirmed = compatible.IsChecked == true;
         bool? trackable = device == null ? null : PrinterIdentity.Confirm(device).IsTrackable;
         string reason;
         if (device == null)
@@ -189,7 +181,7 @@ internal sealed class SetupWindow : AppDialog
         else if (!WindowsPrinterIntegrationService.Eligible(queue))
         {
             reason = "QueueIneligible";
-            status.Text = T("RAW printing is unavailable for the selected queue or mode.");
+            status.Text = WindowsPrinterIntegrationService.IneligibleQueueMessage(queue);
         }
         else if (!createSeparate && queue.Shared)
         {
@@ -198,20 +190,20 @@ internal sealed class SetupWindow : AppDialog
         }
         else
         {
-            reason = confirmed ? "Ready" : "CompatibilityNotConfirmed";
+            reason = "Ready";
             status.Text = T("Verify the printer's model, address, identifier, and driver compatibility.");
         }
         connect.IsEnabled = reason == "Ready";
 
-        var validation = (reason, queue, choice, createSeparate, confirmed);
+        var validation = (reason, queue, choice, createSeparate);
         if (lastValidation == validation)
             return;
 
         lastValidation = validation;
         logger.LogInformation(
-            "Printer setup validation: {SetupReason}; Connect enabled: {ConnectEnabled}; queue: {Queue}; driver: {Driver}; port: {QueuePort}; queue RAW: {QueueRaw}; shared: {QueueShared}; printer: {PrinterModel}; address: {PrinterAddress}; adapter: {Adapter}; detected RAW: {PrinterRaw}; identity verified: {PrinterTrackable}; separate queue: {SeparateQueue}; confirmed: {CompatibilityConfirmed}",
+            "Printer setup validation: {SetupReason}; Connect enabled: {ConnectEnabled}; queue: {Queue}; driver: {Driver}; port: {QueuePort}; queue RAW: {QueueRaw}; shared: {QueueShared}; printer: {PrinterModel}; address: {PrinterAddress}; adapter: {Adapter}; detected RAW: {PrinterRaw}; identity verified: {PrinterTrackable}; separate queue: {SeparateQueue}",
             reason, connect.IsEnabled, queue?.Name, queue?.Driver, queue?.Port, queue?.RawPort, queue?.Shared,
-            device?.Model, device?.Address.ToString(), choice?.Adapter.Name, device?.Raw, trackable, createSeparate, confirmed);
+            device?.Model, device?.Address.ToString(), choice?.Adapter.Name, device?.Raw, trackable, createSeparate);
     }
 
     private static string YesNo(bool value)
@@ -249,7 +241,7 @@ internal sealed class SetupWindow : AppDialog
             wifi.SelectedItem = wifi.Items.Cast<AdapterChoice>().First(item => item.Id == selectedAdapter);
             SpoolerState spool = await Task.Run((Func<SpoolerState>)windows.Read, token);
             string? previous = (queues.SelectedItem as PrinterQueue)?.Name;
-            PrinterQueue[] available = spool.Queues.Where((PrinterQueue queue) => queue.Local && !queue.Port.StartsWith("PrintBridge_", StringComparison.OrdinalIgnoreCase)).ToArray();
+            PrinterQueue[] available = spool.Queues.Where(Dashboard.IsSetupQueue).ToArray();
             queues.Items.Clear();
             foreach (var queue in available)
                 queues.Items.Add(queue);

@@ -163,6 +163,7 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD-PARTY-NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PublishDir}\ThirdParty\*"; DestDir: "{app}\ThirdParty"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PublishDir}\PrintBridge.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PublishDir}\PrintBridge.Cli.exe"; DestDir: "{app}"; Flags: ignoreversion
 #ifdef SignedRelease
 Source: "{#PublishDir}\PrintBridge.exe.sig"; DestDir: "{app}"; Flags: ignoreversion
 #endif

@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "تستخدم قائمة الانتظار المحددة برنامج التشغيل {0}. اختر قائمة انتظار تستخدم برنامج تشغيل طابعة يدعم RAW TCP/9100.",
   "General": "عام",
   "Updates and logs": "التحديثات والسجلات",
   "Local network": "الشبكة المحلية",

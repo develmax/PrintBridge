@@ -9,8 +9,11 @@ internal static class IppDiscovery
     public static async Task<Advertisement?> ProbeAsync(LanAdapter adapter, IPAddress address, string? resource, CancellationToken token)
     {
         resource = (resource ?? "ipp/print").TrimStart('/');
-        if (resource.Length is < 1 or > 200 || resource.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '/' and not '-' and not '_' and not '.'))
+        if (resource.Length is < 1 or > 200 ||
+            resource.Split('/').Any(segment => segment is "." or "..") ||
+            resource.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '/' and not '-' and not '_' and not '.'))
             return null;
+        var printerUri = new Uri($"ipp://{address}:631/{resource}");
         using var handler = new SocketsHttpHandler
         {
             UseProxy = false,
@@ -24,7 +27,7 @@ internal static class IppDiscovery
         };
         using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(2) };
         using var request = new HttpRequestMessage(HttpMethod.Post, $"http://{address}:631/{resource}");
-        request.Content = new ByteArrayContent(BuildRequest($"ipp://{address}:631/{resource}"));
+        request.Content = new ByteArrayContent(BuildRequest(printerUri.AbsoluteUri));
         request.Content.Headers.ContentType = new("application/ipp");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(TimeSpan.FromSeconds(3));
@@ -40,7 +43,7 @@ internal static class IppDiscovery
             {
                 int count = await body.ReadAsync(data.AsMemory(size), deadline.Token).ConfigureAwait(false);
                 if (count == 0)
-                    return Parse(data.AsSpan(0, size), address);
+                    return Parse(data.AsSpan(0, size), printerUri);
                 size += count;
             }
             return null;
@@ -72,7 +75,7 @@ internal static class IppDiscovery
         return stream.ToArray();
     }
 
-    private static Advertisement? Parse(ReadOnlySpan<byte> bytes, IPAddress address)
+    internal static Advertisement? Parse(ReadOnlySpan<byte> bytes, Uri printerUri)
     {
         if (bytes.Length < 9 || bytes[0] is < 1 or > 2 || bytes[2] != 0 ||
             BinaryPrimitives.ReadInt32BigEndian(bytes[4..]) != 1)
@@ -83,7 +86,9 @@ internal static class IppDiscovery
         {
             byte tag = bytes[i++];
             if (tag == 3)
-                return new(address, null, model, id, serial, false, true, false, "IPP");
+                return printerAttributes
+                    ? new(IPAddress.Parse(printerUri.Host), null, model, id, serial, false, true, false, "IPP", printerUri.AbsolutePath)
+                    : null;
             if (tag < 16)
             {
                 printerAttributes = tag == 4;

@@ -58,11 +58,19 @@ public interface ISpooler
 
 public sealed class WindowsPrinterIntegrationService(ISpooler spooler)
 {
+    public static bool UsesIppClassDriver(PrinterQueue queue) =>
+        queue.Driver.Contains("IPP Class", StringComparison.OrdinalIgnoreCase);
+
+    public static string IneligibleQueueMessage(PrinterQueue queue) => UsesIppClassDriver(queue)
+        ? F("The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.", queue.Driver)
+        : T("RAW printing is unavailable for the selected queue or mode.");
+
     public static bool Eligible(PrinterQueue queue)
     {
         if (queue.Local && queue.Port.Length > 0 && !queue.Port.Contains(',') && queue.RawPort != false)
         {
-            return !new string[7] { "IPP Class", "Internet Printing", "Mopria", "XPS Document Writer", "Print to PDF", "Fax", "OneNote" }.Any((string value) => queue.Driver.Contains(value, StringComparison.OrdinalIgnoreCase));
+            return !UsesIppClassDriver(queue) &&
+                !new string[6] { "Internet Printing", "Mopria", "XPS Document Writer", "Print to PDF", "Fax", "OneNote" }.Any((string value) => queue.Driver.Contains(value, StringComparison.OrdinalIgnoreCase));
         }
         return false;
     }

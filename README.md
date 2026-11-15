@@ -32,11 +32,39 @@ Releases include a direct EXE download, a ZIP containing the same EXE, and an MS
 
 PrintBridge checks shortly after launch and every 12 hours while running, and installs newer stable GitHub releases in the background. It verifies the package against GitHub's SHA-256 digest, defers installation while printing or configuration is in progress, and returns to the tray after setup. Automatic updates are enabled by default. To turn them off, clear **Automatically check for and install updates** in **Settings**. **Check for updates now** checks on demand and queues a compatible release for installation, asking for approval if automatic updates are off. PrintBridge shows a tray notification when it queues an update.
 
+## Command line
+
+Run `PrintBridge.Cli.exe` from the PrintBridge installation folder. It sends commands to PrintBridge in the current Windows session and starts it in the tray if needed. The dashboard and tray reflect changes made from the console.
+
+```powershell
+.\PrintBridge.Cli.exe adapters
+.\PrintBridge.Cli.exe queues
+.\PrintBridge.Cli.exe printers
+.\PrintBridge.Cli.exe connect "Office Printer" 192.168.1.42 switch
+.\PrintBridge.Cli.exe status
+.\PrintBridge.Cli.exe restore
+```
+
+Use the exact queue name from `queues` and an address from `printers`. Pass an adapter GUID to `printers` to search that adapter only, and use `--adapter <GUID>` on `connect` to pin it. Use `separate` to create a new queue, or `switch` to change the selected queue's port. `--replace` explicitly authorizes restoring the previous queue before connecting another printer. Windows can prompt for administrator approval when changing a queue.
+
+Run `PrintBridge.Cli.exe help` for the full command list, including connection checks, test printing, bridge controls, printer properties, and diagnostics. Commands return JSON on success and a nonzero exit code with a message on stderr on failure.
+
 ## Troubleshooting
+
+### Experimental IPP proxy
+
+Use `PrintBridge.Cli.exe ipp-start <printer IPv4> <adapter GUID>` to start a loopback IPP proxy.
+Use `adapters` to find the adapter GUID. The command returns a temporary local IPP URI.
+The proxy verifies the printer identity, forwards requests through the selected LAN adapter,
+and rewrites printer and job URIs. It stops with `ipp-stop` or when PrintBridge exits.
+This experimental command does not configure a Windows queue. Existing WSD queue migration,
+automatic address recovery, and Windows IPP printing remain unverified and are not enabled in the setup wizard.
+The normal RAW setup and restoration flow remains available.
 
 | Symptom | What to check |
 | --- | --- |
 | The printer is missing from discovery | Check that it is on, reachable from the selected local network, and accepts RAW TCP on port 9100. |
+| The printer was found but **Connect** is disabled for a Microsoft IPP Class Driver queue | Install the manufacturer's driver for your printer model and add a Windows queue that uses it with a Standard TCP/IP Port set to RAW, port 9100. Select that queue in PrintBridge. |
 | The bridge cannot connect while a VPN is active | Use **Diagnostics** to compare the Windows route with the selected adapter's route. Check whether the VPN allows local LAN traffic. |
 | A job disappears without printing | Check **Last connection error** under **Printer connection** and check the printer's own job log to confirm delivery. |
 | Restore or uninstall reports a conflict | Wait for pending jobs to finish and check whether another queue uses the bridge port. Keep the saved profile until restoration finishes. |

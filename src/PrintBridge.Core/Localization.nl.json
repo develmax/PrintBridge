@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "De geselecteerde wachtrij gebruikt {0}. Selecteer een wachtrij met een printerstuurprogramma dat RAW TCP/9100 ondersteunt.",
   "General": "Algemeen",
   "Updates and logs": "Updates en logboeken",
   "Local network": "Lokaal netwerk",

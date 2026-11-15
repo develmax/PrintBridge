@@ -14,6 +14,7 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        bool commandHost = args.Contains("--cli-host");
         Select(null);
         ApplicationConfiguration.Initialize();
         var services = new ServiceCollection();
@@ -45,7 +46,7 @@ internal static class Program
                 {
                     string message = T("PrintBridge could not verify its signature. Reinstall it from the official release.");
                     provider.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge").LogError("{Message}", message);
-                    if (!args.Any(arg => arg is "--quiet" or "--tray" or "--after-update" or "--install-update"))
+                    if (!commandHost && !args.Any(arg => arg is "--quiet" or "--tray" or "--after-update" or "--install-update"))
                         MessageBox.Show(message, "PrintBridge", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 1;
                 }
@@ -100,11 +101,12 @@ internal static class Program
             {
                 if (!first)
                 {
-                    InstallationIntegrationService.Signal(".Show");
+                    if (!commandHost)
+                        InstallationIntegrationService.Signal(".Show");
                     return 0;
                 }
                 bool afterUpdate = args.Contains("--after-update");
-                using var context = new TrayApplicationContext(provider, args.Contains("--tray") || afterUpdate, afterUpdate);
+                using var context = new TrayApplicationContext(provider, args.Contains("--tray") || afterUpdate || commandHost, afterUpdate, commandHost);
                 Application.Run(context);
             }
             if (RestartRequested)
@@ -115,7 +117,7 @@ internal static class Program
         {
             if (args.FirstOrDefault() != "--spooler")
                 provider.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge").LogError(ex, "Application error");
-            if (!args.Contains("--quiet") && args.FirstOrDefault() != "--install-update")
+            if (!commandHost && !args.Contains("--quiet") && args.FirstOrDefault() != "--install-update")
                 MessageBox.Show(ex.Message, "PrintBridge", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }

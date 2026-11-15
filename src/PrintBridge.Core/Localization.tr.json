@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "Seçilen kuyruk {0} sürücüsünü kullanıyor. RAW TCP/9100 destekleyen bir yazıcı sürücüsüne sahip kuyruk seçin.",
   "General": "Genel",
   "Updates and logs": "Güncellemeler ve günlükler",
   "Local network": "Yerel ağ",

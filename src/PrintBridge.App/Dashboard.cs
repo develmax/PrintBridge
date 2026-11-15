@@ -43,6 +43,9 @@ internal sealed class Dashboard : Form
     private bool networkInvalidated;
 
     private Task? operation;
+    private bool connecting;
+    private Microsoft.AspNetCore.Builder.WebApplication? experimentalIpp;
+    public bool ExperimentalIppRunning => experimentalIpp != null;
 
     public bool Busy => operation != null;
 
@@ -53,7 +56,9 @@ internal sealed class Dashboard : Form
     public PrinterMonitorService Monitor { get; }
 
     public TcpBridgeService Bridge { get; }
-    public Color StatusColor => Monitor.Paused || Settings.Profile == null ? Color.Gray
+    public bool Connecting => connecting;
+    public Color StatusColor => Connecting ? Color.Goldenrod
+        : Monitor.Paused || Settings.Profile == null ? Color.Gray
         : Monitor.State.Searching ? Color.Goldenrod
         : Monitor.State.Available && Bridge.LastError == null ? Color.ForestGreen
         : Color.Firebrick;
@@ -161,22 +166,24 @@ internal sealed class Dashboard : Form
     {
         MonitorState state = Monitor.State;
         PrintPlan? plan = Settings.Profile?.Print ?? Pending;
-        bool ready = state.Available && !state.Searching && Bridge.Running && Bridge.Target != null && Pending == null;
+        bool checking = connecting || state.Searching;
+        bool ready = state.Available && !checking && Bridge.Running && Bridge.Target != null && Pending == null;
         string? model = state.Printer?.Model ?? Settings.Profile?.Identity.Model;
         view.PrinterName.Text = model ?? T("Printer");
         view.QueueName.Text = plan?.Queue ?? T("No queue selected");
         view.PrinterLink.IsEnabled = view.QueueLink.IsEnabled = plan != null;
-        view.StatusIcon.Text = ready ? "✓" : state.Searching ? "…" : plan == null ? "•" : "×";
+        view.StatusIcon.Text = ready ? "✓" : checking ? "…" : plan == null ? "•" : "×";
         view.ConnectionStatus.Text = ready ? T("Ready to print")
-            : state.Searching ? T("Checking connection…")
+            : connecting ? T("Connecting to printer")
+            : checking ? T("Checking connection…")
             : plan == null ? T("No queue selected") : T("Printing unavailable");
-        var statusColor = ready ? "#215F42" : state.Searching || plan == null ? "#365776" : "#84283C";
+        var statusColor = ready ? "#215F42" : checking || plan == null ? "#365776" : "#84283C";
         view.ConnectionStatus.Foreground = view.StatusIcon.Foreground = BrushFromHex(statusColor);
         view.StatusPill.Background = BrushFromHex(ready ? "#D8F3E2"
-            : state.Searching || plan == null ? "#DCE8F6" : "#FBE1E5");
+            : checking || plan == null ? "#DCE8F6" : "#FBE1E5");
         view.FailureReason.Text = Pending != null ? T("Setup did not finish. Restore the queue to continue.")
             : state.Message;
-        view.FailureReason.Visibility = !ready && !state.Searching
+        view.FailureReason.Visibility = !ready && !checking
             ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
         view.QueueJobs.Text = state.Queue is { JobCount: int count } && SpoolerState.Same(state.Queue.Name, plan?.Queue)
             ? F("Jobs in queue: {0}", count) : "";
@@ -215,11 +222,15 @@ internal sealed class Dashboard : Form
         return brush;
     }
 
-    private void OpenPrintDialog(string command)
+    private void OpenPrintDialog(string command, bool interactive = true)
     {
         var plan = Settings.Profile?.Print ?? Pending;
         if (plan == null)
+        {
+            if (!interactive)
+                throw new InvalidOperationException(T("No queue selected"));
             return;
+        }
 
         try
         {
@@ -229,17 +240,19 @@ internal sealed class Dashboard : Form
                 ArgumentList = { "printui.dll,PrintUIEntry", command, "/n", plan.Queue }
             });
         }
-        catch (System.ComponentModel.Win32Exception error)
+        catch (System.ComponentModel.Win32Exception error) when (interactive)
         {
             logger.LogWarning(error, "Could not open the Windows print dialog");
             MessageBox.Show(this, T("Could not open the Windows print dialog."), Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
-    private async Task RunAsync(Func<Task> work, bool background = false, bool showProgress = true)
+    private async Task RunAsync(Func<Task> work, bool background = false, bool showProgress = true, bool command = false)
     {
         if (Busy || exiting)
         {
+            if (command)
+                throw new InvalidOperationException("PrintBridge is busy. Close its dialogs or wait for the current operation, then retry.");
             return;
         }
         view.IsEnabled = false;
@@ -256,10 +269,14 @@ internal sealed class Dashboard : Form
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested)
         {
+            if (command)
+                throw;
         }
         catch (Exception ex2)
         {
             logger.LogError(ex2, T("Operation failed"));
+            if (command)
+                throw;
             if (!background && !exiting)
             {
                 MessageBox.Show(this, ex2.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
@@ -317,33 +334,15 @@ internal sealed class Dashboard : Form
                 SetupSelection? selection = wizard.Selection;
                 if (selection != null)
                 {
-                    if (Settings.Profile != null)
+                    bool replace = Settings.Profile != null;
+                    if (replace)
                     {
                         if (MessageBox.Show(this, T("Restore the current queue and connect the selected printer?"), Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                         {
                             return;
                         }
-                        await RestoreCoreAsync();
                     }
-                    var (adapter, source, device, separate) = selection;
-                    PrinterIdentity identity = PrinterIdentity.Confirm(device);
-                    await Monitor.ConfirmPrinterAsync(adapter, device, identity, Settings.ConnectSeconds, stop.Token);
-                    SpoolerState spooler = await Task.Run((Func<SpoolerState>)windows.Read, stop.Token);
-                    PrintPlan? plan = PrintPlan.Create(source, Settings.LocalPort, separate, spooler);
-                    Monitor.Paused = false;
-                    Monitor.EnsureListener(Settings, plan.LocalPort);
-                    storage.SavePending(plan);
-                    Pending = plan;
-                    logger.LogInformation("User confirmed device {Address} and queue {Queue}", device.Address, source.Name);
-                    await install.ChangeQueueAsync("connect", plan);
-                    Save(Settings with
-                    {
-                        Profile = new Profile(plan, identity, adapter.Id),
-                        Adapter = wizard.AdapterOverride
-                    });
-                    storage.ClearPending();
-                    Pending = null;
-                    await RefreshAsync(force: true);
+                    var plan = await ConnectCoreAsync(selection, wizard.AdapterOverride, replace);
                     if (Monitor.State.Available && !exiting && MessageBox.Show(this, T("Queue connected. Print a test page?"), Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                     {
                         await SubmitTestPageAsync(plan.Queue);
@@ -351,6 +350,250 @@ internal sealed class Dashboard : Form
                 }
             }
         });
+    }
+
+    private async Task<PrintPlan> ConnectCoreAsync(SetupSelection selection, Guid? adapterOverride, bool replace = false)
+    {
+        connecting = true;
+        Render();
+        try
+        {
+            var (adapter, source, device, separate) = selection;
+            var identity = PrinterIdentity.Confirm(device);
+            await Monitor.ConfirmPrinterAsync(adapter, device, identity, Settings.ConnectSeconds, stop.Token);
+            if (replace)
+                await RestoreCoreAsync();
+            var spooler = await Task.Run(windows.Read, stop.Token);
+            var currentSource = spooler.Queue(source.Name);
+            if (currentSource == null || !WindowsPrinterIntegrationService.Eligible(currentSource) ||
+                !SpoolerState.Same(currentSource.Port, source.Port) || !SpoolerState.Same(currentSource.Driver, source.Driver))
+                throw new InvalidOperationException(T("The original queue changed or its driver is incompatible with RAW printing."));
+            var plan = PrintPlan.Create(currentSource, Settings.LocalPort, separate, spooler);
+            Monitor.Paused = false;
+            Monitor.EnsureListener(Settings, plan.LocalPort);
+            storage.SavePending(plan);
+            Pending = plan;
+            logger.LogInformation("User confirmed device {Address} and queue {Queue}", device.Address, source.Name);
+            await install.ChangeQueueAsync("connect", plan);
+            Save(Settings with { Profile = new Profile(plan, identity, adapter.Id), Adapter = adapterOverride });
+            storage.ClearPending();
+            Pending = null;
+            await RefreshAsync(force: true);
+            // The printer can sleep while Windows changes its port. Keep setup active
+            // while retrying reachability, without repeating the queue transaction.
+            for (int attempt = 1; Monitor.State.RetryConnection && attempt < 6; attempt++)
+            {
+                logger.LogInformation("Waiting for printer after queue setup, connection check {Attempt}", attempt + 1);
+                await Task.Delay(TimeSpan.FromSeconds(2), stop.Token);
+                await RefreshAsync(force: false);
+            }
+            return plan;
+        }
+        finally
+        {
+            connecting = false;
+            Render();
+        }
+    }
+
+    internal async Task<object> ExecuteCommandAsync(string[] args)
+    {
+        string command = args[0];
+        if (args.Length == 1)
+        {
+            switch (command)
+            {
+                case "status": return CommandStatus();
+                case "diagnostics": return CreateReport(includeIdentifiers: false);
+                case "logs": return new { Directory = SettingsService.LogFolder };
+            }
+        }
+
+        object? result = null;
+        await RunAsync(async () =>
+        {
+            switch (command)
+            {
+                case "adapters" when args.Length == 1:
+                    result = (await Task.Run(adapters.GetAdapters, stop.Token)).Select(item => new
+                    {
+                        item.Id, item.Name, item.ConnectionType, Address = item.Address.ToString(), item.Prefix
+                    }).ToArray();
+                    break;
+                case "queues" when args.Length == 1:
+                    result = (await Task.Run(windows.Read, stop.Token)).Queues.Select(queue => new
+                    {
+                        queue.Name, queue.Driver, queue.Port, queue.Host, queue.Status, queue.JobCount, queue.Shared,
+                        Eligible = IsSetupQueue(queue) && WindowsPrinterIntegrationService.Eligible(queue)
+                    }).ToArray();
+                    break;
+                case "printers" when args.Length <= 2:
+                    var spooler = await Task.Run(windows.Read, stop.Token);
+                    var hints = spooler.Queues.Where(IsSetupQueue).Select(queue => queue.Host).OfType<string>().ToArray();
+                    var candidates = new List<object>();
+                    foreach (var adapter in await CommandAdaptersAsync(args.Length == 2 ? args[1] : null))
+                    {
+                        foreach (var device in await discovery.FindAsync(adapter, hints, scan: true, stop.Token))
+                            candidates.Add(new
+                            {
+                                Adapter = adapter.Id, Address = device.Address.ToString(), device.Model, device.Host,
+                                device.Raw, device.Ipp, device.VerifiedIppUri, device.Lpr,
+                                Trackable = PrinterIdentity.Confirm(device).IsTrackable
+                            });
+                    }
+                    result = candidates;
+                    break;
+                case "connect" when args.Length >= 4:
+                    await ConnectCommandAsync(args);
+                    break;
+                case "restore" or "disconnect" when args.Length == 1:
+                    await RestoreCoreAsync();
+                    break;
+                case "check" when args.Length == 1:
+                    await RefreshAsync(force: true);
+                    break;
+                case "open-queue" or "printer-properties" when args.Length == 1:
+                    OpenPrintDialog(command == "open-queue" ? "/o" : "/p", interactive: false);
+                    break;
+                case "start" or "stop" or "restart" when args.Length == 1:
+                    await SetBridgeAsync(command);
+                    break;
+                case "test-page" when args.Length == 1:
+                    var queueName = ConfiguredQueue();
+                    await SubmitTestPageAsync(queueName, notify: false);
+                    result = new { Queued = true, Queue = queueName };
+                    break;
+                case "ipp-start" when args.Length == 3:
+                    if (experimentalIpp != null)
+                        throw new InvalidOperationException("Experimental IPP proxy is already running. Use ipp-stop first.");
+                    if (!System.Net.IPAddress.TryParse(args[1], out var ippAddress) ||
+                        ippAddress.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork ||
+                        !Guid.TryParse(args[2], out var ippAdapter))
+                        throw new ArgumentException("Use ipp-start <printer IPv4> <adapter GUID>.");
+                    var lan = (await CommandAdaptersAsync(ippAdapter.ToString())).Single();
+                    var found = await discovery.CheckAddressAsync(lan, ippAddress, stop.Token);
+                    if (found?.VerifiedIppUri is not { } endpoint || !PrinterIdentity.Confirm(found).IsTrackable)
+                        throw new InvalidOperationException("No verified IPP printer found at this address.");
+                    var target = new BridgeTarget(lan, found, PrinterIdentity.Confirm(found));
+                    experimentalIpp = await IppProxy.StartAsync(0, () => target, async (destination, token) =>
+                    {
+                        var observed = await discovery.CheckAddressAsync(destination.Adapter, destination.Printer.Address, token);
+                        if (observed == null || !identities.Matches(destination.Identity, observed))
+                            throw new IOException("IPP printer identity could not be verified.");
+                        var socket = await RoutingDiagnosticsService.ConnectAsync(destination.Adapter,
+                            destination.Printer.Address, endpoint.Port, TimeSpan.FromSeconds(Settings.ConnectSeconds), token);
+                        return socket.GetStream();
+                    }, logger, stop.Token);
+                    var local = new Uri(experimentalIpp.Urls.Single());
+                    result = new { Experimental = true, Uri = new UriBuilder("ipp", "127.0.0.1", local.Port)
+                        { Path = endpoint.AbsolutePath }.Uri.AbsoluteUri,
+                        QueueConfigured = false, Lifetime = "Until ipp-stop or PrintBridge exits" };
+                    break;
+                case "ipp-stop" when args.Length == 1:
+                    if (experimentalIpp != null)
+                    {
+                        await experimentalIpp.StopAsync(stop.Token);
+                        await experimentalIpp.DisposeAsync();
+                        experimentalIpp = null;
+                    }
+                    result = new { Stopped = true };
+                    break;
+                default:
+                    throw new ArgumentException("Invalid command or arguments. Run PrintBridge.Cli help.");
+            }
+        }, showProgress: false, command: true);
+        return result ?? CommandStatus();
+    }
+
+    private object CommandStatus() => new
+    {
+        Version = Program.Version, Busy, Connecting = connecting, Monitor.Paused, Bridge.Running,
+        Available = !connecting && Monitor.State.Available, Monitor.State.Searching,
+        Message = connecting ? T("Connecting to printer") : Monitor.State.Message,
+        Queue = Settings.Profile?.Print.Queue, PrinterAddress = Monitor.State.Printer?.Address.ToString() ?? Settings.Profile?.Identity.LastAddress,
+        JobCount = Monitor.State.Queue?.JobCount, RecoveryRequired = Pending != null && !connecting
+    };
+
+    internal static bool IsSetupQueue(PrinterQueue queue) =>
+        queue.Local && !queue.Port.StartsWith("PrintBridge_", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<LanAdapter[]> CommandAdaptersAsync(string? adapterId)
+    {
+        Guid? selected = adapterId == null ? null : Guid.Parse(adapterId);
+        var available = await Task.Run(adapters.GetAdapters, stop.Token);
+        var candidates = LanAdapter.OrderForPrinter(available, selected, Settings.Profile?.LastAdapter, null);
+        return candidates.Length > 0 ? candidates : throw new InvalidOperationException("No matching LAN adapter is available.");
+    }
+
+    private async Task ConnectCommandAsync(string[] args)
+    {
+        if (args[3] is not ("separate" or "switch") ||
+            !System.Net.IPAddress.TryParse(args[2], out var address) ||
+            address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+            throw new ArgumentException("Use connect <queue> <IPv4> <separate|switch> [--adapter <GUID>] [--replace].");
+
+        string? adapterId = null;
+        bool replace = false;
+        for (int index = 4; index < args.Length; index++)
+        {
+            switch (args[index])
+            {
+                case "--confirm-raw":
+                    break;
+                case "--replace":
+                    replace = true;
+                    break;
+                case "--adapter" when index + 1 < args.Length && adapterId == null:
+                    adapterId = args[++index];
+                    break;
+                default:
+                    throw new ArgumentException($"Unknown connect option: {args[index]}.");
+            }
+        }
+
+        if (Pending != null)
+            throw new InvalidOperationException(T("Restore the queue from the incomplete setup first."));
+        if (Settings.Profile != null && !replace)
+            throw new InvalidOperationException("A printer is already connected. Use --replace to restore its queue and connect another printer.");
+
+        var spooler = await Task.Run(windows.Read, stop.Token);
+        var source = spooler.Queue(args[1]);
+        var original = Settings.Profile?.Print;
+        if (replace && original is { Separate: false } && source != null && SpoolerState.Same(source.Name, original.Queue))
+            source = source with { Port = original.OriginalPort, RawPort = null };
+        bool separate = args[3] == "separate";
+        if (source == null || !IsSetupQueue(source) || (!separate && source.Shared))
+            throw new InvalidOperationException(T("RAW printing is unavailable for the selected queue or mode."));
+        if (!WindowsPrinterIntegrationService.Eligible(source))
+            throw new InvalidOperationException(WindowsPrinterIntegrationService.IneligibleQueueMessage(source));
+
+        foreach (var adapter in await CommandAdaptersAsync(adapterId))
+        {
+            var device = await discovery.CheckAddressAsync(adapter, address, stop.Token);
+            if (device is { Raw: true } && PrinterIdentity.Confirm(device).IsTrackable)
+            {
+                await ConnectCoreAsync(new SetupSelection(adapter, source, device, separate), adapterId == null ? null : adapter.Id, replace);
+                return;
+            }
+        }
+        throw new InvalidOperationException("The printer did not respond on TCP 9100 with a verifiable identity through the selected LAN adapter(s).");
+    }
+
+    private string ConfiguredQueue()
+    {
+        if (Settings.Profile is not { } profile || !Bridge.Running || Bridge.Target == null || Pending != null)
+            throw new InvalidOperationException(T("Check the queue and bridge configuration first."));
+        return profile.Print.Queue;
+    }
+
+    private async Task SetBridgeAsync(string command)
+    {
+        Monitor.Paused = command == "stop";
+        if (command != "start")
+            await Bridge.DisposeAsync();
+        if (Monitor.Paused)
+            logger.LogInformation("User stopped the bridge");
+        await RefreshAsync(force: false);
     }
 
     private Task RestoreAsync()
@@ -388,48 +631,27 @@ internal sealed class Dashboard : Form
 
     public Task RestartAsync()
     {
-        return RunAsync(async () =>
-        {
-            await Bridge.DisposeAsync();
-            Monitor.Paused = false;
-            await RefreshAsync(force: false);
-        });
+        return RunAsync(() => SetBridgeAsync("restart"));
     }
 
     public Task ToggleAsync()
     {
-        return RunAsync(async () =>
-        {
-            Monitor.Paused = !Monitor.Paused;
-            if (Monitor.Paused)
-            {
-                await Bridge.DisposeAsync();
-                logger.LogInformation("User stopped the bridge");
-            }
-            await RefreshAsync(force: false);
-        });
+        return RunAsync(() => SetBridgeAsync(Monitor.Paused ? "start" : "stop"));
     }
 
     private Task TestPageAsync()
     {
-        return RunAsync(async () =>
-        {
-            Profile? profile = Settings.Profile;
-            if (profile == null || !Bridge.Running || Bridge.Target == null || Pending != null)
-            {
-                throw new InvalidOperationException(T("Check the queue and bridge configuration first."));
-            }
-            await SubmitTestPageAsync(profile.Print.Queue);
-        });
+        return RunAsync(() => SubmitTestPageAsync(ConfiguredQueue()));
     }
 
-    private async Task SubmitTestPageAsync(string queue)
+    private async Task SubmitTestPageAsync(string queue, bool notify = true)
     {
         await Task.Run(() =>
         {
             windows.TestPage(queue);
         }, stop.Token);
-        MessageBox.Show(this, T("Windows queued the test page. Check the printer for the result."), Text, MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+        if (notify)
+            MessageBox.Show(this, T("Windows queued the test page. Check the printer for the result."), Text, MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
     }
 
     public Task SettingsAsync()
@@ -552,6 +774,8 @@ internal sealed class Dashboard : Form
             await operation;
         }
         await Bridge.DisposeAsync();
+        if (experimentalIpp != null)
+            await experimentalIpp.DisposeAsync();
         stop.Dispose();
     }
 

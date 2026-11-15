@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "Изабрани ред користи управљачки програм {0}. Изаберите ред са управљачким програмом штампача који подржава RAW TCP/9100.",
   "General": "Опште",
   "Updates and logs": "Ажурирања и евиденција",
   "Local network": "Локална мрежа",

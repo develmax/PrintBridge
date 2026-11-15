@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "Вибрана черга використовує драйвер {0}. Виберіть чергу з драйвером принтера, який підтримує RAW TCP/9100.",
   "General": "Основні",
   "Updates and logs": "Оновлення та журнали",
   "Local network": "Локальна мережа",
