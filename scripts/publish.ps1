@@ -8,13 +8,15 @@ $project = Join-Path $root 'src/PrintBridge.App/PrintBridge.App.csproj'
 $output = Join-Path $root "artifacts/publish/$Runtime"
 dotnet publish $project -c Release -r $Runtime --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:UseSharedCompilation=false "-p:PrintBridgeSignedRelease=$($Sign.IsPresent.ToString().ToLowerInvariant())" -m:1 -o $output
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
+dotnet publish (Join-Path $root 'src/PrintBridge.Cli/PrintBridge.Cli.csproj') -c Release -r $Runtime --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=embedded -p:UseSharedCompilation=false -m:1 -o $output
+if ($LASTEXITCODE -ne 0) { throw 'CLI publish failed' }
 
 $assets = Get-Content -Raw (Join-Path (Split-Path $project) 'obj/project.assets.json') | ConvertFrom-Json -AsHashtable
 $packages = @(
     $assets.libraries.GetEnumerator() | Where-Object { $_.Value.type -eq 'package' } |
         ForEach-Object { $_.Value.path }
     $assets.project.frameworks.Values | ForEach-Object { $_.downloadDependencies } |
-        Where-Object { $_.name -in "Microsoft.NETCore.App.Runtime.$Runtime", "Microsoft.WindowsDesktop.App.Runtime.$Runtime" } |
+        Where-Object { $_.name -in "Microsoft.NETCore.App.Runtime.$Runtime", "Microsoft.WindowsDesktop.App.Runtime.$Runtime", "Microsoft.AspNetCore.App.Runtime.$Runtime" } |
         ForEach-Object { "$($_.name.ToLowerInvariant())/$((($_.version -split ',')[0]).Trim('[', ']', ' '))" }
 )
 $notices = Join-Path $output 'ThirdParty'

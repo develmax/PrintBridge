@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "La file sélectionnée utilise {0}. Sélectionnez une file dont le pilote d’imprimante prend en charge RAW TCP/9100.",
   "General": "Général",
   "Updates and logs": "Mises à jour et journaux",
   "Local network": "Réseau local",

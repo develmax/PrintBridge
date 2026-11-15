@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "Wybrana kolejka używa sterownika {0}. Wybierz kolejkę ze sterownikiem drukarki obsługującym RAW TCP/9100.",
   "General": "Ogólne",
   "Updates and logs": "Aktualizacje i dzienniki",
   "Local network": "Sieć lokalna",

@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "Die ausgewählte Warteschlange verwendet {0}. Wählen Sie eine Warteschlange mit einem Druckertreiber, der RAW TCP/9100 unterstützt.",
   "General": "Allgemein",
   "Updates and logs": "Updates und Protokolle",
   "Local network": "Lokales Netzwerk",

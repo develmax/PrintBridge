@@ -88,6 +88,8 @@ public sealed record PrinterQueue(string Name, string Driver, string Port, strin
 
 public sealed record NetworkPrinter(IPAddress Address, string? Host, string? Model, string? Mac, string? Serial, string? DeviceId, bool Raw, bool Ipp, bool Lpr, string Source)
 {
+    public Uri? VerifiedIppUri { get; init; }
+
     public override string ToString()
     {
         return $"{Address} · {Model ?? Host ?? T("Unknown model")} · {Mac ?? Serial ?? T("No MAC or serial number")} · {(Raw ? "TCP/9100" : T("RAW unavailable"))} · {Source}";

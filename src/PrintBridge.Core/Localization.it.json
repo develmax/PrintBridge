@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "La coda selezionata usa {0}. Seleziona una coda con un driver di stampa che supporti RAW TCP/9100.",
   "General": "Generali",
   "Updates and logs": "Aggiornamenti e registri",
   "Local network": "Rete locale",

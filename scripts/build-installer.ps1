@@ -21,6 +21,7 @@ if (-not $Iscc) { throw 'ISCC.exe is missing. Install Inno Setup or pass -Iscc.'
 if ($Sign) {
     $app = Join-Path $root "artifacts/publish/$Runtime/PrintBridge.exe"
     & (Join-Path $PSScriptRoot 'sign-binary.ps1') $app
+    & (Join-Path $PSScriptRoot 'sign-binary.ps1') (Join-Path (Split-Path $app) 'PrintBridge.Cli.exe')
     $public = Get-PfxCertificate (Join-Path $root 'docs/printbridge-signing.cer')
     $certificate = Get-Item "Cert:/CurrentUser/My/$($public.Thumbprint)"
     $key = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($certificate)

@@ -1,4 +1,5 @@
 {
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "所选队列使用 {0} 驱动程序。请选择使用支持 RAW TCP/9100 的打印机驱动程序的队列。",
   "General": "常规",
   "Updates and logs": "更新和日志",
   "Local network": "本地网络",

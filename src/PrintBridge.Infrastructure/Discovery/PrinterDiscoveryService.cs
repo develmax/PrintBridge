@@ -71,7 +71,10 @@ public sealed class PrinterDiscoveryService(ILogger<PrinterDiscoveryService> log
         }
         Advertisement[] matches = (await AdvertiseAsync(() => DiscoveryPackets.MdnsAsync(adapter, token), "mDNS", token).ConfigureAwait(continueOnCapturedContext: false)).Where((Advertisement ad) => ad.Address.Equals(address)).ToArray();
         Advertisement? ipp = await IppDiscovery.ProbeAsync(adapter, address, matches.Select((Advertisement ad) => ad.Resource).FirstOrDefault((string? resource) => resource != null), token).ConfigureAwait(continueOnCapturedContext: false);
-        return new NetworkPrinter(address, null, ipp?.Model, mac, ipp?.Serial ?? Unique(matches.Select((Advertisement ad) => ad.Serial)), ipp?.Id ?? Unique(matches.Select((Advertisement ad) => ad.Id)), Raw: true, ipp != null, Lpr: false, (ipp == null) ? "DNS-SD" : "IPP");
+        return new NetworkPrinter(address, null, ipp?.Model, mac, ipp?.Serial ?? Unique(matches.Select((Advertisement ad) => ad.Serial)), ipp?.Id ?? Unique(matches.Select((Advertisement ad) => ad.Id)), Raw: true, ipp != null, Lpr: false, (ipp == null) ? "DNS-SD" : "IPP")
+        {
+            VerifiedIppUri = VerifiedIppUri(ipp)
+        };
     }
 
     private static async Task<NetworkPrinter?> InspectAsync(LanAdapter adapter, IPAddress address, Advertisement[] ads, bool known, CancellationToken token)
@@ -129,8 +132,14 @@ public sealed class PrinterDiscoveryService(ILogger<PrinterDiscoveryService> log
         string? deviceId = uuid;
         bool raw = rawOpen;
         bool ipp2 = ippOpen || ads.Any((Advertisement ad) => ad.Ipp);
-        return new NetworkPrinter(address, host2, model2, mac2, serial2, deviceId, raw, ipp2, await lpr.ConfigureAwait(continueOnCapturedContext: false) || ads.Any((Advertisement ad) => ad.Lpr), string.Join(", ", sources));
+        return new NetworkPrinter(address, host2, model2, mac2, serial2, deviceId, raw, ipp2, await lpr.ConfigureAwait(continueOnCapturedContext: false) || ads.Any((Advertisement ad) => ad.Lpr), string.Join(", ", sources))
+        {
+            VerifiedIppUri = VerifiedIppUri(details)
+        };
     }
+
+    private static Uri? VerifiedIppUri(Advertisement? response) => response?.Resource is { } path
+        ? new Uri($"ipp://{response.Address}:631{path}") : null;
 
     private static string? Unique(IEnumerable<string?> values)
     {

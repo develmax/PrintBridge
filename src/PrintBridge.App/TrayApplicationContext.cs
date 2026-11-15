@@ -57,13 +57,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private DateTimeOffset nextCheck;
 
-    public TrayApplicationContext(IServiceProvider services, bool trayLaunch, bool afterUpdate)
+    public TrayApplicationContext(IServiceProvider services, bool trayLaunch, bool afterUpdate, bool commandHost = false)
     {
         quietStartup = trayLaunch;
         logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("PrintBridge");
         updates = new GitHubUpdateService(logger);
         windows = services.GetRequiredService<WindowsPrinterService>();
         dashboard = ActivatorUtilities.CreateInstance<Dashboard>(services, Array.Empty<object>());
+        _ = dashboard.Handle;
+        _ = CommandPipe.ServeAsync(Program.SessionName, args => dashboard.InvokeAsync<object>(
+            async token => await dashboard.ExecuteCommandAsync(args), lifetime.Token), logger, lifetime.Token);
         dashboard.CheckUpdatesRequested += CheckForUpdateAsync;
         dashboard.SettingsClosed += () =>
         {
@@ -153,7 +156,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         timer.Start();
         logger.LogInformation("PrintBridge {Version} started", Program.Version);
         Render();
-        if (!afterUpdate && (!trayLaunch || !dashboard.Settings.StartHidden || dashboard.Settings.Profile == null))
+        if (!commandHost && !afterUpdate && (!trayLaunch || !dashboard.Settings.StartHidden || dashboard.Settings.Profile == null))
         {
             Open();
         }
@@ -230,14 +233,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private async Task<bool> CanUpdateAsync()
     {
-        if (closing || !(dashboard.Settings.AutoUpdate || updateApproved) || dashboard.Busy || dashboard.Pending != null || dashboard.Bridge.Active != 0)
+        if (closing || !(dashboard.Settings.AutoUpdate || updateApproved) || dashboard.Busy || dashboard.ExperimentalIppRunning || dashboard.Pending != null || dashboard.Bridge.Active != 0)
             return false;
 
         var profile = dashboard.Settings.Profile;
         try
         {
             return (profile == null || !await Task.Run(() => windows.HasJobs(profile.Print.Queue))) &&
-                !closing && (dashboard.Settings.AutoUpdate || updateApproved) && !dashboard.Busy && dashboard.Pending == null &&
+                !closing && (dashboard.Settings.AutoUpdate || updateApproved) && !dashboard.Busy && !dashboard.ExperimentalIppRunning && dashboard.Pending == null &&
                 dashboard.Settings.Profile == profile && dashboard.Bridge.Active == 0;
         }
         catch (Exception ex)
@@ -377,7 +380,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private void Render()
     {
         MonitorState state = dashboard.Monitor.State;
-        status.Text = state.Message;
+        status.Text = dashboard.Connecting ? T("Connecting to printer") : state.Message;
         toggle.Text = (dashboard.Monitor.Paused ? T("Start bridge") : T("Stop bridge"));
         Color color = dashboard.StatusColor;
         if (color != lastColor)
@@ -403,7 +406,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             icon = updated;
             lastColor = color;
         }
-        if (!state.Searching && state.Message != previousStatus)
+        if (!dashboard.Connecting && !state.Searching && state.Message != previousStatus)
         {
             if (!quietStartup && previousStatus != null && dashboard.Settings.Notify && dashboard.Settings.Profile != null && !dashboard.Visible)
             {

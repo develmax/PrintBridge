@@ -95,6 +95,7 @@
   "The device did not provide a MAC address, UUID, or serial number. Automatic tracking is unavailable.": "Устройство не предоставило MAC, UUID или серийный номер. Автоматическое отслеживание этого устройства недоступно.",
   "Verify the printer's model, address, identifier, and driver compatibility.": "Сверьте модель, адрес и идентификатор с принтером. Открытый TCP/9100 сам по себе не подтверждает совместимость драйвера.",
   "RAW printing is unavailable for the selected queue or mode.": "Для выбранной очереди или режима RAW-интеграция недоступна.",
+  "The selected queue uses {0}. Select a queue with a printer driver that supports RAW TCP/9100.": "В выбранной очереди используется драйвер {0}. Выберите очередь с драйвером, поддерживающим RAW TCP/9100.",
   "yes": "да",
   "Finding network adapters, queues, and printers…": "Поиск сетевых адаптеров, очередей и принтеров…",
   "Connect to the selected local network and try again.": "Подключитесь к выбранной локальной сети и повторите поиск.",
